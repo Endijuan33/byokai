@@ -1,6 +1,7 @@
 package com.byokai.data.local.datastore
 
-import androidx.datastore.preferences.PreferenceDataStoreFactory
+import androidx.datastore.core.DataStoreFactory
+import androidx.datastore.preferences.core.PreferencesSerializer
 import com.byokai.core.common.Result
 import com.byokai.domain.model.AppLanguage
 import com.byokai.domain.model.ThemeMode
@@ -29,7 +30,10 @@ class SettingsDataStoreTest {
         testFile = File.createTempFile("byokai-settings-test", ".preferences_pb")
         testFile.delete()
         dataStore = SettingsDataStore(
-            PreferenceDataStoreFactory.create(produceFile = { testFile }),
+            DataStoreFactory.create(
+                serializer = PreferencesSerializer,
+                produceFile = { testFile },
+            ),
         )
     }
 

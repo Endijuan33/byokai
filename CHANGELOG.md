@@ -43,7 +43,10 @@ Phase 2: application foundation.
   (Phase 1) still green.
 - Dependencies (all stable, verified 2026-10-21): kotlinx-coroutines
   1.11.0 (core/android/test, repo1.maven.org), Compose Material
-  icons-core (BOM-managed), DataStore Preferences 1.2.1 now wired in.
+  icons-core + icons-extended (BOM-managed; verified against the real
+  artifacts that `ChatBubbleOutline` only ships in -extended),
+  DataStore Preferences 1.2.1 now wired in via the `preferencesDataStore`
+  delegate (`PreferenceDataStoreFactory` was removed in DataStore 1.2.x).
 
 ### Changed
 
