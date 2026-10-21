@@ -5,6 +5,57 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-22
+
+Phase 4: Advanced Chat Experience, Prompt Management & Data Portability
+(milestones 4A–4E).
+
+### Added
+
+- Database migrations (4A): versioned, transactional migration
+  framework (`DbHandle`/`DatabaseMigration`/`MigrationRunner` — pure
+  Kotlin, JVM-tested against a real SQLite engine via
+  `org.xerial:sqlite-jdbc:3.53.4.0`, test-scoped). Schema v2:
+  `conversations.system_prompt` (nullable TEXT) + `prompts` table
+  (id, title, content, is_builtin, created_at, updated_at). No
+  destructive migrations.
+- Markdown rendering (4B): assistant messages render via
+  `com.mikepenz:multiplatform-markdown-renderer-m3-android:0.46.0`
+  (headings, bold/italic, lists, inline code, code blocks with
+  built-in copy button, tables). Raw HTML cannot execute (pure
+  Compose renderer, no WebView; unhandled nodes degrade to plain
+  text — verified from the 0.46.0 sources). Links open only on
+  explicit tap and only for absolute http/https URLs (`LinkSafety`,
+  JVM-tested); anything else is silently dropped. Streaming-safe:
+  parsing is async and conflated per text change.
+- Prompt management (4C): `PromptTemplate` domain +
+  `SqlitePromptRepository` (CRUD, 4 editable built-in seeds inserted
+  only when the table is empty), management screen (Settings →
+  Prompts), and a per-conversation system prompt picker in the chat
+  screen. The system prompt travels via each adapter's native
+  channel (OpenAI system message, Anthropic `system` field, Gemini
+  `systemInstruction`) — adapter tests assert it never leaks into
+  user messages.
+- Context management (4D): heuristic token ESTIMATE (labeled "est.",
+  never an official count) shown subtly in chat; request-side
+  truncation keeps the system prompt + newest messages within
+  `contextWindow − 2048` reserve tokens, with conservative fallbacks
+  (50 messages / ~128k chars) when the window is unknown
+  (`ModelInfo.contextWindow`, currently null for all adapters).
+  Persisted history is never modified. LLM summarization deferred.
+- Export/import (4E): versioned JSON
+  (`{"format":"byokai-export","version":1,…}`, documented in
+  `docs/EXPORT.md`) via SAF CreateDocument/OpenDocument, 50 MB cap,
+  corrupt files rejected with user-friendly errors, import
+  confirmation when conversations exist, fresh UUIDs on import.
+  Exports carry conversation text only — never credentials
+  (asserted by test).
+
+### Fixed
+
+- `PromptRepository` missing `com.byokai.core.common.Result`
+  import (resolved to `kotlin.Result`, breaking all overrides).
+
 ## [0.3.0] — 2026-10-22
 
 Phase 3: BYOK core (milestones 3A–3E).

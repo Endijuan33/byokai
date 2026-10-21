@@ -145,4 +145,18 @@
     <!-- Estimasi konteks (heuristik, berlabel "est.") -->
     <string name="chat_context_estimate">est. %1$s token</string>
     <string name="chat_context_truncated">%1$d pesan lama dipangkas dari request</string>
+    <!-- Portabilitas data (ekspor/impor) -->
+    <string name="settings_section_data">Data</string>
+    <string name="settings_export">Ekspor percakapan</string>
+    <string name="settings_export_summary">Simpan semua percakapan sebagai file JSON</string>
+    <string name="settings_import">Impor percakapan</string>
+    <string name="settings_import_summary">Pulihkan percakapan dari file JSON</string>
+    <string name="settings_export_done">Percakapan berhasil diekspor.</string>
+    <string name="settings_export_error">Gagal mengekspor percakapan. Coba lagi.</string>
+    <string name="settings_import_done">Diimpor %1$d percakapan (%2$d pesan).</string>
+    <string name="settings_import_read_error">Gagal membaca file yang dipilih.</string>
+    <string name="settings_import_invalid">File ini tidak dapat diimpor: %1$s</string>
+    <string name="settings_import_confirm_title">Impor percakapan?</string>
+    <string name="settings_import_confirm_body">Anda sudah memiliki percakapan. Percakapan yang diimpor ditambahkan sebagai salinan baru — mengimpor file yang sama dua kali akan menciptakan duplikat.</string>
+    <string name="settings_import_confirm_ok">Impor</string>
 </resources>

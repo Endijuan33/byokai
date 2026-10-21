@@ -49,11 +49,17 @@ The provider system is tested entirely against fakes and scripted servers —
 - **Real API keys / real provider endpoints** — never, by rule. Behavior
   against live servers is validated only with the user's own key on
   their own device; it cannot happen in CI or in this repository.
-- **Real SQLite on the JVM** — `SqliteConversationRepository` and
-  `ByokaiDatabase` are Android-only (they need a `Context` and the
-  `sqlite-framework` driver); they are not instantiated in JVM unit
-  tests. The `ConversationRepository` contract they implement is covered
-  through the in-memory fake in `ConversationsViewModelTest`.
+- **Real SQLite on the JVM** — `SqliteConversationRepository`,
+  `SqlitePromptRepository`, and `ByokaiDatabase` are Android-only (they
+  need a `Context` and the `sqlite-framework` driver); they are not
+  instantiated in JVM unit tests. Their contracts are covered through
+  in-memory fakes (`ConversationsViewModelTest`,
+  `PromptsViewModelTest`). **Exception (Phase 4A):** the migration
+  *logic* (`DatabaseMigration` objects) IS tested against a real
+  SQLite engine on the JVM via `org.xerial:sqlite-jdbc` (test-scoped):
+  `MigrationTest` builds a v1 database, migrates, and asserts data
+  preservation — the Android `SupportSQLiteDatabase` wrapper itself is
+  the only untested seam.
 - **On-device Keystore** — `src/androidTest` ships
   `TinkCredentialStoreKeystoreTest` for the keystore-backed path, but it
   requires a real device/emulator and **does not run in CI** (Phase 5
@@ -72,7 +78,7 @@ The provider system is tested entirely against fakes and scripted servers —
 | Instrumented tests | `connectedDebugAndroidTest` | Deferred — Phase 5 device matrix |
 | Screenshot tests | Planned | Planned (Phase 4) |
 
-## Current coverage (Phase 3)
+## Current coverage (Phase 4)
 
 - `VersionInfoTest` (Phase 1) — still green.
 - Phase 2: enum storage-key round-trips, `SettingsViewModel` + fake,
@@ -81,8 +87,27 @@ The provider system is tested entirely against fakes and scripted servers —
   tests; `SseReader`/`RetryPolicy`/`EndpointValidator` unit tests;
   JVM Tink credential-store tests; provider-config repository tests;
   `ChatViewModel`/`ChatPersistence`/`ProvidersViewModel`/
-  `ConversationsViewModel` tests with fakes. All green in CI at the
-  Phase 3E merge commit.
+  `ConversationsViewModel` tests with fakes.
+- Phase 4 (all green in CI):
+  - `MigrationTest` — v1→v2 on a real JVM SQLite engine (data
+    preservation, prompts table, rollback on failure, fail-fast on a
+    missing migration).
+  - `LinkSafetyTest` — the http/https allowlist (dangerous schemes,
+    relative and malformed URLs rejected).
+  - `BuiltinPromptsTest` — seed set validity.
+  - `PromptsViewModelTest` — seeding, CRUD, delete confirmation.
+  - Adapter tests extended: explicit assertions that the system
+    prompt travels only via the native channel (OpenAI system
+    message, Anthropic `system`, Gemini `systemInstruction`) and
+    never leaks into user messages.
+  - `TokenEstimatorTest` / `ContextPolicyTest` — heuristic and
+    truncation (order, system-prompt budgeting, fallbacks).
+  - `ByokaiExportTest` — envelope, round-trip fidelity with fresh
+    ids, no-credential-material assertion, all rejection paths.
+- Honest gap: no Compose UI/golden tests (need instrumented tests;
+  deferred to the Phase 5 device matrix). Markdown rendering
+  correctness relies on the pinned upstream library (0.46.0) plus
+  on-device validation.
 
 ## Required coverage as features land
 

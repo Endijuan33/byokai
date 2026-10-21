@@ -160,6 +160,18 @@ fun SettingsScreen(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+            SectionTitle(stringResource(R.string.settings_section_data))
+
+            DataPortabilitySection(
+                exportManager = application.appContainer.exportManager,
+                conversationRepository = application.appContainer.conversationRepository,
+                onMessage = { message ->
+                    scope.launch { snackbarHostState.showSnackbar(message) }
+                },
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
             SectionTitle(stringResource(R.string.settings_section_about))
 
             InfoRow(
@@ -241,7 +253,7 @@ private fun SwitchRow(
 
 /** Navigation row: title + summary, whole row tappable. */
 @Composable
-private fun NavRow(title: String, summary: String, onClick: () -> Unit) {
+internal fun NavRow(title: String, summary: String, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()

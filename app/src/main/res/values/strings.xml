@@ -145,4 +145,18 @@
     <!-- Context estimate (heuristic, labeled "est.") -->
     <string name="chat_context_estimate">est. %1$s tokens</string>
     <string name="chat_context_truncated">%1$d older messages truncated from request</string>
+    <!-- Data portability (export/import) -->
+    <string name="settings_section_data">Data</string>
+    <string name="settings_export">Export conversations</string>
+    <string name="settings_export_summary">Save all conversations as a JSON file</string>
+    <string name="settings_import">Import conversations</string>
+    <string name="settings_import_summary">Restore conversations from a JSON file</string>
+    <string name="settings_export_done">Conversations exported.</string>
+    <string name="settings_export_error">Could not export conversations. Please try again.</string>
+    <string name="settings_import_done">Imported %1$d conversations (%2$d messages).</string>
+    <string name="settings_import_read_error">Could not read the selected file.</string>
+    <string name="settings_import_invalid">Cannot import this file: %1$s</string>
+    <string name="settings_import_confirm_title">Import conversations?</string>
+    <string name="settings_import_confirm_body">You already have conversations. Imported conversations are added as new copies — importing the same file twice creates duplicates.</string>
+    <string name="settings_import_confirm_ok">Import</string>
 </resources>

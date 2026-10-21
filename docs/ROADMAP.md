@@ -68,12 +68,27 @@ scripted MockWebServer fixtures, not yet against the real provider
 endpoints with the user's own key — that is a device-side validation,
 explicitly not done in CI (no real keys in this repository, ever).
 
-## Phase 4 — Advanced AI features — NOT STARTED
+## Phase 4 — Advanced Chat Experience, Prompt Management & Data Portability — SHIPPED (v0.4.0, 2026-10-22)
 
-Markdown/code rendering, prompt management, vision/file input where
-supported, tool calling with user confirmation, agent orchestration,
-context management, export/import. Acceptance: each shipped feature covered
-by tests; unimplemented features clearly marked as such in UI.
+- **4A database migration**: versioned, transactional migration
+  framework; schema v2 (`conversations.system_prompt`, `prompts`
+  table); JVM migration tests on a real SQLite engine.
+- **4B markdown rendering**: assistant messages via mikepenz
+  renderer-m3 0.46.0 (headings, lists, code blocks + copy, tables,
+  safe links); raw HTML cannot execute; streaming-safe.
+- **4C prompt management**: template CRUD + 4 editable builtins,
+  management screen, per-conversation system prompt via each
+  adapter's native channel (wire-tested per provider).
+- **4D context management**: heuristic token ESTIMATE ("est." label),
+  request-side truncation (system prompt + newest within
+  contextWindow − 2048; fallback 50 msgs / ~128k chars); history
+  never modified; LLM summarization deferred.
+- **4E export/import**: versioned JSON (`docs/EXPORT.md`), SAF,
+  50 MB cap, import confirmation, fresh UUIDs, no credentials.
+- Not shipped (remain future work): vision/file input, tool calling,
+  agent orchestration.
+
+## Phase 5 — Security and compatibility — NOT STARTED
 
 ## Phase 5 — Security and compatibility — NOT STARTED
 

@@ -134,19 +134,38 @@ than needed. The read side is bounded: streams are capped at 8 MiB
 (`SseReader.MAX_BYTES`), error bodies at 64 KiB, model listings at
 1 MiB — a misbehaving server cannot force unbounded allocation.
 
-## Database (Phase 3, Milestone 3E)
+## Database (Phase 3, Milestone 3E; schema v2 in Phase 4, Milestone 4A)
 
 `byokai.db` (`data.local.db.ByokaiDatabase`, hand-rolled SQLite via
-`androidx.sqlite:sqlite-framework:2.7.1`, schema v1:
-`conversations`, `messages`, one index, FK cascade on delete) holds
+`androidx.sqlite:sqlite-framework:2.7.1`, schema v2:
+`conversations` (+ nullable `system_prompt`), `messages`,
+`prompts`, one index, FK cascade on delete) holds
 conversation text and metadata **only — NEVER API keys**. Keys live
-exclusively in the Tink-backed `CredentialStore`. The conversation
+exclusively in the Tink-backed `CredentialStore`. Schema upgrades run
+through the versioned, transactional `MigrationRunner`; destructive
+migrations are forbidden. The conversation
 database file is *not* encrypted by this app; anyone with filesystem
 access to the app's private storage can read conversation text. This
 is a deliberate scope boundary: the DB holds chat content the user
 already sees on screen, not secrets. If a threat model requires
 encrypted conversation history, that is a future milestone, not a
 claim made here.
+
+## Phase 4 additions (Milestones 4B/4E)
+
+- **Markdown link safety (4B).** Model output is untrusted: link taps
+  in rendered markdown pass `LinkSafety` (absolute http/https only)
+  before reaching `ACTION_VIEW`. `javascript:`/`data:`/`file:` and
+  relative URLs are dropped. The renderer is pure Compose — no
+  WebView, no HTML engine — so raw HTML in model output cannot
+  execute (verified from the 0.46.0 sources: unhandled node types
+  degrade to plain text).
+- **Export files (4E).** Exports contain conversation text and
+  metadata only — the export path has no access to the credential
+  store, and `ByokaiExportTest` asserts no key-like material appears
+  in the output. Export/import content is never written to logs;
+  import failures surface only the validation reason. The 50 MB
+  import cap is enforced on raw bytes before parsing.
 
 ## Honest caveat (restated)
 

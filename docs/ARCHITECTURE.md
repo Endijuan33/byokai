@@ -1,6 +1,6 @@
 # Architecture
 
-## Status: Phase 3 — BYOK core (milestones 3A–3E complete, 3F in progress)
+## Status: Phase 4 — Advanced Chat Experience, Prompt Management & Data Portability (milestones 4A–4E complete, 4F in progress)
 
 This document describes the architecture **as implemented today** plus the
 planned module boundaries for later phases. Anything marked "planned" does
@@ -163,14 +163,40 @@ Design decisions (added or changed in Phase 3):
   every write; writes return `Result`.
 - **Hand-rolled SQLite, no Room.** `ByokaiDatabase` mirrors the
   DataStore holder pattern (one process-wide `SupportSQLiteOpenHelper`
-  via `FrameworkSQLiteOpenHelperFactory`). Schema v1 has no migration
-  yet; the first schema change must add a real migration, not a table
-  drop.
+  via `FrameworkSQLiteOpenHelperFactory`). Schema v2 (Phase 4):
+  `conversations.system_prompt` + `prompts` table; upgrades run
+  through the versioned `MigrationRunner` — destructive migrations
+  are forbidden.
 - All other Phase 2 decisions stand: single activity + Compose
   Navigation, Material 3 + Dynamic Color, DataStore settings, per-app
   language with the documented `runBlocking` tradeoff, `Result`/`UiText`
   error handling, full en/id localization, no hardcoded UI text,
   minSdk 28 / targetSdk 37, environment-driven release signing.
+
+## Implemented (Phase 4 — milestones 4A–4E)
+
+- **Database migrations (4A)**: `data.local.db.migration`
+  (`DbHandle`, `DatabaseMigration`, `MigrationRunner`) — pure Kotlin,
+  transactional, gapless version chain; `SupportDbHandle` adapts
+  `SupportSQLiteDatabase` on Android, a JDBC handle backs JVM tests.
+  Schema v2: `conversations.system_prompt` + `prompts` table.
+- **Markdown rendering (4B)**: `ui.chat.AssistantMarkdownText`
+  wraps `com.mikepenz:multiplatform-markdown-renderer-m3-android:0.46.0`;
+  `core.ui.LinkSafety` (pure http/https allowlist) gates link taps via
+  a `UriHandler` override.
+- **Prompt management (4C)**: `domain.model.PromptTemplate` /
+  `BuiltinPrompts`, `domain.repository.PromptRepository`,
+  `data.repository.SqlitePromptRepository`, `ui.prompts`
+  (ViewModel + management screen, route `prompts`, Settings entry),
+  per-conversation system prompt in `ChatViewModel`/`ChatScreen`.
+- **Context management (4D)**: `core.chat.TokenEstimator` (heuristic,
+  "est."-labeled) + `core.chat.ContextPolicy` (request-side
+  truncation); `ModelInfo.contextWindow` (nullable); estimate label in
+  chat UI.
+- **Export/import (4E)**: `data.export` (`ByokaiExport` DTOs,
+  `ByokaiExportFormat` validation, `ConversationExportManager`);
+  format documented in `docs/EXPORT.md`; SAF UI in Settings → Data.
+- All Phase 3 decisions stand.
 
 ## Planned module boundaries (Phase 2+)
 

@@ -14,6 +14,7 @@ import com.byokai.data.repository.SettingsRepositoryImpl
 import com.byokai.data.repository.SqliteConversationRepository
 import com.byokai.data.security.AndroidKeysetAeadProvider
 import com.byokai.data.security.CredentialStorageHolder
+import com.byokai.data.export.ConversationExportManager
 import com.byokai.data.repository.SqlitePromptRepository
 import com.byokai.data.security.TinkCredentialStore
 import com.byokai.domain.chat.ChatRepository
@@ -118,5 +119,16 @@ class AppContainer(context: Context) {
      */
     val promptRepository: PromptRepository by lazy {
         SqlitePromptRepository(ByokaiDatabase.get(appContext))
+    }
+
+    /**
+     * Conversation export/import as versioned JSON (Milestone 4E).
+     *
+     * Carries conversation text and metadata only — the underlying
+     * [conversationRepository] has no access to API keys or other
+     * credentials, so they cannot leak into an export.
+     */
+    val exportManager: ConversationExportManager by lazy {
+        ConversationExportManager(conversationRepository)
     }
 }
