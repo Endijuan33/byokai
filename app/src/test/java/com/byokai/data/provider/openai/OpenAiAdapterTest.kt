@@ -129,8 +129,11 @@ class OpenAiAdapterTest {
 
         val events = collectAll()
 
-        assertEquals(1, events.size)
-        val error = events[0] as ChatEvent.Error
+        // The partial chunk is still delivered as a Delta; the missing
+        // [DONE] sentinel then surfaces as a terminal Parse error.
+        assertEquals(2, events.size)
+        assertTrue(events[0] is ChatEvent.Delta)
+        val error = events[1] as ChatEvent.Error
         assertTrue(error.error is ProviderError.Parse)
         assertTrue((error.error as ProviderError.Parse).message.contains("[DONE]"))
     }
@@ -237,7 +240,7 @@ class OpenAiAdapterTest {
         assertEquals("/v1/chat/completions", recorded.target)
         assertEquals("Bearer test-key-123", recorded.headers["Authorization"])
         val body = ProviderJson.parseToJsonElement(recorded.body?.utf8().orEmpty()).jsonObject
-        assertEquals(true, body["stream"]!!.jsonPrimitive.boolean)
+        assertEquals(true, body["stream"]?.jsonPrimitive?.boolean, "request body was: $body")
         assertEquals("gpt-4o", body["model"]!!.jsonPrimitive.content)
         val messages = body["messages"]!!.jsonArray
         assertEquals(2, messages.size)
