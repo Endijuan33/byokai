@@ -18,6 +18,9 @@ android {
         versionCode = 2
         // Overridable from the release workflow via -Pbyokai.versionName=<x.y.z>.
         versionName = (findProperty("byokai.versionName") as String?) ?: "0.2.0"
+        // Milestone 3B ships an instrumented test for the keystore-backed
+        // credential path; runs on-device only (Phase 5 device matrix), not CI.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -103,7 +106,17 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
+    // Milestone 3B: Android Keystore + Tink encryption for API keys at rest.
+    implementation(libs.tink.android)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // JVM Tink for pure-JVM credential-store tests (no Android APIs).
+    testImplementation(libs.tink)
+
+    // Instrumented tests (keystore path): on-device only, not CI.
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.junit)
 }

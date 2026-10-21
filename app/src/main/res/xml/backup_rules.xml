@@ -1,9 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <!--
-        Phase 1: the app stores no credentials or sensitive data, so nothing is
-        excluded yet. When encrypted credential storage lands in Phase 3, the
-        files holding encrypted keys MUST be excluded here (and from
-        auto-backup) so key material never leaves the device via backup.
+        Phase 3 (Milestone 3B): API keys are encrypted at rest (Android
+        Keystore master key + Tink AES-256-GCM data-encryption keyset).
+
+        The encrypted store MUST stay on the device:
+
+        - datastore/byokai_credentials.preferences_pb — DataStore file
+          holding Base64-encoded key ciphertexts.
+        - byokai_tink_keyset.xml — shared preferences file holding the
+          Tink keyset, itself encrypted by the Keystore master key
+          (android-keystore://byokai_master_key).
+
+        Restoring these to a different device (or after a lock-screen
+        reset) could never decrypt them — the Keystore key does not
+        travel — so they are excluded from full backup and auto-backup.
+        On a restore the keyset is missing while old ciphertexts cannot
+        exist either; a freshly installed keyset encountering a
+        permanently invalidated master key surfaces as
+        CredentialException.KeyInvalidated and the user re-enters keys.
     -->
+    <exclude domain="file" path="datastore/byokai_credentials.preferences_pb"/>
+    <exclude domain="sharedpref" path="byokai_tink_keyset.xml"/>
 </full-backup-content>

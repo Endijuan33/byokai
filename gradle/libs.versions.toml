@@ -24,6 +24,10 @@ navigationCompose = "2.10.2"
 serializationJson = "1.12.0"
 okhttp = "5.5.0"
 tinkAndroid = "1.24.0"
+# JVM Tink for unit tests: real AES-256-GCM encryption against an ephemeral
+# keyset, verified on repo1.maven.org 2026-10-21 (stable). The on-device
+# keystore-backed path (tink-android) is covered by instrumented tests only.
+tink = "1.24.0"
 datastorePreferences = "1.2.1"
 # kotlinx.coroutines 1.11.0 verified on repo1.maven.org 2026-10-21 (stable).
 # Pinned explicitly so the version is deterministic instead of floating on
@@ -31,6 +35,12 @@ datastorePreferences = "1.2.1"
 # artifact is needed for ViewModel unit tests (TestDispatcher + runTest).
 coroutines = "1.11.0"
 junit = "4.13.2"
+# Instrumented-test runners. Versions verified against
+# https://dl.google.com/dl/android/maven2/.../maven-metadata.xml
+# on 2026-10-21 (stable).
+androidxTestRunner = "1.7.0"
+androidxTestExtJunit = "1.3.0"
+androidxTestCore = "1.7.0"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
@@ -46,6 +56,8 @@ navigation-compose = { group = "androidx.navigation", name = "navigation-compose
 serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 tink-android = { group = "com.google.crypto.tink", name = "tink-android", version.ref = "tinkAndroid" }
+# JVM Tink (unit tests only). Verified on repo1.maven.org 2026-10-21 (stable).
+tink = { group = "com.google.crypto.tink", name = "tink", version.ref = "tink" }
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
 # BOM-managed: no version.ref, the Compose BOM supplies a tested version.
 # Verified against the real artifacts (2026-10-21): ChatBubbleOutline lives
@@ -56,6 +68,12 @@ kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+# Instrumented-test dependencies. Versions verified against
+# https://dl.google.com/dl/android/maven2/.../maven-metadata.xml
+# on 2026-10-21 (stable). Used only under src/androidTest.
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
+androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTestCore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

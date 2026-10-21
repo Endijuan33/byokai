@@ -20,12 +20,22 @@ com.byokai/
 │   └── ui/                     # LocaleHelper (context locale wrapping)
 ├── data/
 │   ├── local/datastore/        # SettingsDataStore + process-wide holder
-│   └── repository/             # SettingsRepositoryImpl
+│   ├── repository/             # SettingsRepositoryImpl
+│   └── security/               # [Phase 3, Milestone 3B] Credential
+│                             #   storage: TinkCredentialStore (Tink
+│                             #   AES-256-GCM), DataStoreCredentialStorage
+│                             #   (dedicated byokai_credentials file),
+│                             #   AndroidKeysetAeadProvider (Android
+│                             #   Keystore master key)
 ├── di/
 │   └── AppContainer.kt         # Manual DI: lazy singletons (interim)
 ├── domain/
 │   ├── model/                  # ThemeMode, AppLanguage (pure enums)
-│   └── repository/             # SettingsRepository interface
+│   ├── repository/             # SettingsRepository interface
+│   └── security/               # [Phase 3, Milestone 3B] CredentialStore
+│                             #   interface + CredentialException (pure
+│                             #   Kotlin; ProviderConfig intentionally
+│                             #   carries NO apiKey field)
 ├── ui/
 │   ├── ByokaiApp.kt            # Root NavHost (routes: "home", "settings")
 │   ├── home/HomeScreen.kt      # Conversation list + honest empty state
@@ -65,6 +75,18 @@ Design decisions:
 - **Error handling.** Repositories return `Result`; ViewModels translate
   failures to `UiText` on an error channel; screens show a Snackbar.
   ViewModels never hold a `Context`.
+- **Credential storage (Phase 3, Milestone 3B).** `domain.security`
+  defines the `CredentialStore` interface (`save`/`load`/`delete`/
+  `clearAll`) and `CredentialException` (`KeyInvalidated`,
+  `DecryptionFailed`, `StorageError`) — pure Kotlin, no Android APIs.
+  `data.security` implements it with Tink AES-256-GCM: the DEK keyset is
+  encrypted by an Android Keystore master key
+  (`android-keystore://byokai_master_key`), ciphertexts live in a
+  dedicated DataStore file (`byokai_credentials`, excluded from backups),
+  and the config id is AEAD associated data. `ProviderConfig`
+  deliberately has no `apiKey` field — configs can be exported, logged, or
+  displayed without ever exposing a secret. Keystore invalidation wipes
+  the store and forces key re-entry. Full design: [SECURITY.md](SECURITY.md).
 - **Localization.** All UI strings live in `values/strings.xml` (English,
   default) and `values-in/strings.xml` (Indonesian). No hardcoded text in
   Composables.
