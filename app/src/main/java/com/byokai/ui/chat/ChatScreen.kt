@@ -274,15 +274,19 @@ private fun ConfigDropdown(
             configs.forEach { config ->
                 val ready = keyReady[config.id] == true
                 DropdownMenuItem(
-                    text = { Text(config.displayName) },
-                    supportingText = {
-                        Text(
-                            if (ready) {
-                                config.baseUrl
-                            } else {
-                                stringResource(R.string.providers_no_key)
-                            },
-                        )
+                    text = {
+                        Column {
+                            Text(config.displayName)
+                            Text(
+                                if (ready) {
+                                    config.baseUrl
+                                } else {
+                                    stringResource(R.string.providers_no_key)
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     },
                     enabled = ready,
                     onClick = {
