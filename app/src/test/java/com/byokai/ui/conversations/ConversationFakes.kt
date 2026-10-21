@@ -82,6 +82,15 @@ class FakeConversationRepository : ConversationRepository {
         return Result.Success(Unit)
     }
 
+    override suspend fun setSystemPrompt(id: String, systemPrompt: String?): Result<Unit> {
+        if (failWrites) return Result.Error(RuntimeException("simulated IO failure"))
+        conversations[id]?.let {
+            conversations[id] = it.copy(systemPrompt = systemPrompt, updatedAt = tick())
+            emitConversations()
+        }
+        return Result.Success(Unit)
+    }
+
     override fun messages(conversationId: String): Flow<List<Message>> =
         messageFlows.getOrPut(conversationId) {
             MutableStateFlow(messages[conversationId].orEmpty())

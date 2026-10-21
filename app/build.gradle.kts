@@ -122,6 +122,10 @@ dependencies {
     testImplementation(libs.mockwebserver3)
     // JVM Tink for pure-JVM credential-store tests (no Android APIs).
     testImplementation(libs.tink)
+    // Pure-JVM SQLite engine for migration tests (4A). Test-scoped only.
+    testImplementation(libs.sqlite.jdbc)
+    // Milestone 4B: Compose Material3 markdown rendering for AI answers.
+    implementation(libs.markdown.renderer.m3)
 
     // Instrumented tests (keystore path): on-device only, not CI.
     androidTestImplementation(libs.androidx.test.runner)

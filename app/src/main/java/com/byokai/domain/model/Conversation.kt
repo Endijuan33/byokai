@@ -12,10 +12,14 @@ package com.byokai.domain.model
  * @property title user-visible title.
  * @property createdAt epoch millis when the conversation was created.
  * @property updatedAt epoch millis of the last message append or rename.
+ * @property systemPrompt optional per-conversation system instruction,
+ * sent to the provider through the adapter's system-prompt channel
+ * (never mixed into user messages). Null when unset.
  */
 data class Conversation(
     val id: String,
     val title: String,
     val createdAt: Long,
     val updatedAt: Long,
+    val systemPrompt: String? = null,
 )
