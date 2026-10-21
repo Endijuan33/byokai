@@ -22,9 +22,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.job
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
@@ -73,21 +72,22 @@ class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
      * started, every failure is terminal.
      *
      * Collecting the flow on `Dispatchers.IO`; cancelling the collector
-     * cancels the in-flight HTTP call via Job.invokeOnClose.
+     * cancels the in-flight HTTP call.
      */
     override fun streamChat(
         config: ProviderConfig,
         apiKey: String,
         request: ChatRequest,
-    ): Flow<ChatEvent> = flow {
+    ): Flow<ChatEvent> = callbackFlow {
         when (val validation = EndpointValidator.validate(config.baseUrl)) {
             is EndpointValidation.Invalid -> {
-                emit(
+                trySend(
                     ChatEvent.Error(
                         ProviderError.Server(0, "Invalid endpoint: ${validation.reason}"),
                     ),
                 )
-                return@flow
+                close()
+                return@callbackFlow
             }
             is EndpointValidation.Valid -> Unit
         }
@@ -100,14 +100,11 @@ class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
             ),
         )
 
-        // Cancelling the collecting coroutine cancels the in-flight HTTP
-        // call; OkHttp's cancel() unblocks the reader's blocking socket
-        // read, so cancellation is prompt. A plain cold flow is used here
-        // (no callback channel) since collection and reading run in the
-        // same coroutine.
-        var activeCall: Call? = null
-        currentCoroutineContext().job.invokeOnClose { activeCall?.cancel() }
-
+        // Cancellation: when the collector is cancelled, the producer
+        // coroutine is cancelled too and the finally below cancels the
+        // in-flight call, which unblocks the socket read (bounded by the
+        // 60s read timeout at worst).
+        var call: Call? = null
         try {
             var attempt = 0
             var streamStarted = false
@@ -121,8 +118,7 @@ class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
                     .header("Content-Type", "application/json")
                     .header("Accept", "text/event-stream")
                     .build()
-                val call = client.newCall(httpRequest)
-                activeCall = call
+                call = client.newCall(httpRequest)
                 try {
                     val response = call.execute()
                     try {
@@ -139,15 +135,15 @@ class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
                                 delay(decision.delayMillis)
                                 continue
                             }
-                            emit(ChatEvent.Error(error))
-                            return@flow
+                            trySend(ChatEvent.Error(error))
+                            return@callbackFlow
                         }
                         try {
                             SseReader.readAll(response.body.source()) { message ->
                                 ensureActive()
                                 if (message.data.isBlank()) return@readAll
                                 if (message.data == DONE_SENTINEL) {
-                                    emit(ChatEvent.Done(fullText.toString()))
+                                    trySend(ChatEvent.Done(fullText.toString()))
                                     throw TerminalEventSent()
                                 }
                                 val chunk = try {
@@ -155,7 +151,7 @@ class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
                                         message.data,
                                     )
                                 } catch (_: SerializationException) {
-                                    emit(
+                                    trySend(
                                         ChatEvent.Error(
                                             ProviderError.Parse("Malformed SSE data chunk"),
                                         ),
@@ -166,10 +162,10 @@ class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
                                 if (!text.isNullOrEmpty()) {
                                     fullText.append(text)
                                     streamStarted = true
-                                    emit(ChatEvent.Delta(text))
+                                    trySend(ChatEvent.Delta(text))
                                 }
                             }
-                            emit(
+                            trySend(
                                 ChatEvent.Error(
                                     ProviderError.Parse("stream ended without [DONE]"),
                                 ),
@@ -177,7 +173,7 @@ class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
                         } catch (_: TerminalEventSent) {
                             // Terminal event already emitted; fall through to close.
                         }
-                        return@flow
+                        return@callbackFlow
                     } finally {
                         response.close()
                     }
@@ -190,8 +186,8 @@ class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
                         delay(decision.delayMillis)
                         continue
                     }
-                    emit(ChatEvent.Error(ProviderError.Timeout))
-                    return@flow
+                    trySend(ChatEvent.Error(ProviderError.Timeout))
+                    return@callbackFlow
                 } catch (e: IOException) {
                     // InterruptedIOException from call.cancel() arrives here on
                     // collector cancellation; ensureActive rethrows
@@ -204,12 +200,12 @@ class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
                         delay(decision.delayMillis)
                         continue
                     }
-                    emit(ChatEvent.Error(error))
-                    return@flow
+                    trySend(ChatEvent.Error(error))
+                    return@callbackFlow
                 }
             }
         } finally {
-            activeCall?.cancel()
+            call?.cancel()
         }
     }.flowOn(Dispatchers.IO)
 
