@@ -5,6 +5,8 @@ import com.byokai.core.network.HttpClientFactory
 import com.byokai.data.chat.ChatRepositoryImpl
 import com.byokai.data.local.datastore.ProviderConfigHolder
 import com.byokai.data.local.datastore.SettingsDataStoreHolder
+import com.byokai.data.provider.anthropic.AnthropicAdapter
+import com.byokai.data.provider.gemini.GeminiAdapter
 import com.byokai.data.provider.openai.OpenAiAdapter
 import com.byokai.data.repository.DataStoreProviderConfigRepository
 import com.byokai.data.repository.SettingsRepositoryImpl
@@ -62,10 +64,15 @@ class AppContainer(context: Context) {
     /**
      * Adapters for the provider families the app can talk to.
      *
-     * OpenAI first; more adapters register here in later milestones.
+     * OpenAI first (Milestone 3C); Anthropic and Gemini added in
+     * Milestone 3D. New adapters register here.
      */
     val providerRegistry: ProviderRegistry by lazy {
-        ProviderRegistry().apply { register(OpenAiAdapter(httpClient)) }
+        ProviderRegistry().apply {
+            register(OpenAiAdapter(httpClient))
+            register(AnthropicAdapter(httpClient))
+            register(GeminiAdapter(httpClient))
+        }
     }
 
     /**
