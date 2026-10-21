@@ -26,6 +26,17 @@ android {
     }
 
     signingConfigs {
+        // Stable debug keystore committed to the repo: every CI/local
+        // build shares ONE debug signature, so debug APK updates install
+        // cleanly over each other instead of conflicting
+        // (INSTALL_FAILED_UPDATE_INCOMPATIBLE). This key is for debug
+        // builds only and must NEVER be used for release signing.
+        getByName("debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "byokai-debug"
+            keyAlias = "byokai-debug"
+            keyPassword = "byokai-debug"
+        }
         create("release") {
             // Release signing is driven exclusively by environment variables, which the
             // release workflow populates from GitHub Actions secrets. When the variables

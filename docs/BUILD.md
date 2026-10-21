@@ -62,6 +62,18 @@ gradle testDebugUnitTest --stacktrace    # JVM unit tests
 gradle lintDebug --stacktrace           # Android lint (fails on errors)
 ```
 
+## Debug signing
+
+Debug builds are signed with the stable `debug.keystore` at the repo
+root (password/alias `byokai-debug`, committed intentionally). Every
+CI and local build therefore shares one debug signature, so debug
+APK updates install cleanly over each other instead of failing with
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE` (each fresh CI runner would
+otherwise generate its own throwaway debug key). This key is for
+debug builds only and must never be used for release signing; the
+release key lives exclusively in GitHub Secrets (see
+`docs/RELEASE.md`).
+
 ## Artifacts
 
 - `ci.yml` uploads `byokai-debug-apk` (the debug APK, 30-day retention) and
