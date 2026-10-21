@@ -5,6 +5,7 @@ import com.byokai.domain.security.CredentialException
 import com.byokai.domain.security.CredentialStore
 import com.google.crypto.tink.Aead
 import com.google.crypto.tink.KeysetHandle
+import com.google.crypto.tink.aead.AeadConfig
 import com.google.crypto.tink.aead.AeadKeyTemplates
 import java.util.Base64
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,9 +41,13 @@ class TinkCredentialStoreTest {
         }
     }
 
-    private fun ephemeralAead(): Aead =
-        KeysetHandle.generateNew(AeadKeyTemplates.AES256_GCM)
+    private fun ephemeralAead(): Aead {
+        // Tink key managers must be registered before any primitive use;
+        // register() is idempotent so calling it per-test is safe.
+        AeadConfig.register()
+        return KeysetHandle.generateNew(AeadKeyTemplates.AES256_GCM)
             .getPrimitive(Aead::class.java)
+    }
 
     private fun ephemeralProvider(aead: Aead = ephemeralAead()) =
         object : AeadProvider {
