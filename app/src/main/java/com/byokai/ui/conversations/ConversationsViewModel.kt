@@ -75,6 +75,8 @@ class ConversationsViewModel(
                 is Result.Success -> _openConversation.trySend(result.data.id)
                 is Result.Error ->
                     _errors.trySend(UiText.Res(R.string.conversations_create_error))
+                // Repository writes never return Loading; defensive.
+                is Result.Loading -> Unit
             }
         }
     }

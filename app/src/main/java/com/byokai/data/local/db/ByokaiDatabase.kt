@@ -8,7 +8,8 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 /**
  * Process-wide access to the BYOKAI SQLite database (`byokai.db`).
  *
- * Mirrors the DataStore holder pattern (`data/local/datastore/*Holder.kt`):
+ * Mirrors the DataStore holder pattern (see the holders under
+ * `data/local/datastore/`):
  * a single [SupportSQLiteOpenHelper] per process, created through
  * [FrameworkSQLiteOpenHelperFactory]. No Room — KSP has no 2.4.x release
  * for Kotlin 2.4.21, so all SQL here is hand-rolled.

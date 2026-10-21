@@ -240,6 +240,8 @@ class ChatViewModel(
                             error = UiText.Res(R.string.conversations_create_error),
                         )
                     }
+                // Repository writes never return Loading; defensive.
+                is Result.Loading -> Unit
             }
         }
     }
@@ -394,6 +396,8 @@ class ChatViewModel(
                 }
                 null
             }
+            // Repository writes never return Loading; defensive.
+            is Result.Loading -> null
         }
     }
 
@@ -419,6 +423,8 @@ class ChatViewModel(
                 }
                 false
             }
+            // Repository writes never return Loading; defensive.
+            is Result.Loading -> false
         }
     }
 
