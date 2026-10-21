@@ -33,16 +33,40 @@ Acceptance:
 - [x] `versionCode` 2 / `versionName` 0.2.0; CHANGELOG + docs updated.
 - [x] CI green on the Phase 2 commit.
 
-Note: the local database schema (Room) stays deferred with Phase 3 — KSP
-still has no Kotlin 2.4.x release, so conversation persistence waits.
+Note: conversation persistence is hand-rolled SQLite via
+`androidx.sqlite:sqlite-framework:2.7.1` (Phase 3, Milestone 3E) — Room
+stays deferred on KSP, but persistence no longer waits on it.
 
-## Phase 3 — BYOK core — NOT STARTED
+## Phase 3 — BYOK core — IN PROGRESS (milestones 3A–3E complete, 3F in progress)
 
 Provider registry, `ProviderAdapter` interface + first adapters, encrypted
 credential storage (Keystore + Tink), model selector, streaming chat,
 conversation history, error/timeout/retry/cancellation handling.
 Acceptance: real streamed chat against at least two providers with the user's
 own key; adapter contract tests green; credential redaction tests green.
+
+Milestones (all CI green at their merge commits):
+
+- [x] **3A** — provider domain foundation: `AiProvider` contract,
+  `ProviderRegistry`, `ProviderConfig`/`ProviderCapabilities`/`ProviderError`,
+  `EndpointValidator`.
+- [x] **3B** — encrypted credential storage: Tink AES-256-GCM + Android
+  Keystore master key, backup-excluded store, key-invalidation wipe path.
+- [x] **3C** — OpenAI adapter (Chat Completions SSE), streaming
+  `ChatRepository`, providers screen (add/edit/delete/test configs) and
+  streaming chat UI.
+- [x] **3D** — Anthropic + Gemini adapters with MockWebServer contract
+  tests; registry wiring.
+- [x] **3E** — hand-rolled SQLite persistence (`byokai.db`, schema v1),
+  `ConversationRepository`, conversation history UI.
+- [ ] **3F** — documentation + version bump (in progress): provider docs,
+  security/network docs, architecture/roadmap/testing docs, CHANGELOG,
+  `versionCode` 3 / `versionName` 0.3.0.
+
+Remaining acceptance gap: streamed chat has been validated against
+scripted MockWebServer fixtures, not yet against the real provider
+endpoints with the user's own key — that is a device-side validation,
+explicitly not done in CI (no real keys in this repository, ever).
 
 ## Phase 4 — Advanced AI features — NOT STARTED
 
@@ -77,10 +101,12 @@ quality/security audits.
   Central is 2.3.12, verified 2026-10-21). Reintroduce when KSP publishes a
   2.4.x-compatible version; until then, manual constructor injection.
 - **Room (local database):** deferred for the same KSP reason (latest Room
-  2.8.5 needs KSP). Conversation history persistence waits on this.
+  2.8.5 needs KSP). Phase 3 ships conversation persistence anyway, as
+  hand-rolled SQLite (`androidx.sqlite:sqlite-framework:2.7.1`); Room
+  stays the long-term option once KSP supports Kotlin 2.4.x.
 - **R8/minification:** intentionally off until Phase 5.
 
-## Version decisions (all verified 2026-10-21)
+## Version decisions (all verified 2026-10-21 unless marked otherwise)
 
 | Artifact | Version | Source |
 |---|---|---|
@@ -100,5 +126,7 @@ quality/security audits.
 | tink-android | 1.24.0 | repo1.maven.org maven-metadata |
 | datastore-preferences | 1.2.1 | dl.google.com maven-metadata |
 | kotlinx-coroutines (core/android/test) | 1.11.0 | repo1.maven.org maven-metadata |
+| mockwebserver3 | 5.5.0 | repo1.maven.org maven-metadata (verified 2026-10-22) |
+| androidx.sqlite sqlite-framework | 2.7.1 | dl.google.com maven-metadata (verified 2026-10-22) |
 | compose material-icons-core | BOM-managed | Compose BOM 2026.09.00 |
 | junit | 4.13.2 | repo1.maven.org maven-metadata |

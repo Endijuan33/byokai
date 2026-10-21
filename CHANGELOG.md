@@ -5,6 +5,67 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-10-22
+
+Phase 3: BYOK core (milestones 3A–3E).
+
+### Added
+
+- Provider system: `AiProvider` adapter contract, `ProviderRegistry`
+  (one adapter per `ProviderId`, duplicate registration fails fast),
+  typed `ProviderError`s (Auth/RateLimited/Timeout/Network/
+  InvalidModel/Server/Parse/Config), and `ProviderConfig` validation
+  (HTTPS-only base URLs via `EndpointValidator`, non-empty model ids,
+  `defaultModelId` ∈ `modelIds`). Configs carry no API key by design.
+- Three streaming adapters: OpenAI (`OpenAiAdapter`, Chat Completions
+  SSE with `data: [DONE]`; also serves OpenAI-compatible endpoints via
+  a custom base URL), Anthropic (`AnthropicAdapter`, Messages API,
+  `event:`-driven SSE, `max_tokens: 1024`, no model-listing endpoint —
+  returns the config's known model ids), and Gemini (`GeminiAdapter`,
+  `streamGenerateContent`, `x-goog-api-key`, `candidates[0].content.
+  parts[].text`, EOF-terminated). All adapters: per-request endpoint
+  re-validation, pre-Delta-only retries (max 2, exponential backoff +
+  capped `Retry-After`), 401/403→Auth / 429→RateLimited / 404→
+  InvalidModel normalization, and cancellation that kills the in-flight
+  call.
+- Encrypted credential storage (Tink AES-256-GCM + Android Keystore
+  master key): isolated `byokai_credentials` DataStore file, config id
+  as AEAD associated data, backup exclusions, wipe-and-recover on
+  keystore invalidation; JVM-testable via `java.util.Base64`.
+- Providers screen: add/edit/delete provider configs, save and test
+  API keys; typed keystrokes stay in the composable until the moment of
+  the action, never in ViewModel state. Connection tests are cheap
+  (`GET /v1/models` or `/v1beta/models`) except Anthropic, which needs
+  a minimal real `max_tokens: 1` model call (documented micro-cost).
+- Streaming chat UI: config/model selectors (only configs with a saved
+  key selectable), live message bubbles, Stop while generating, error
+  banner with Retry, honest empty states.
+- Conversation history: hand-rolled SQLite (`byokai.db`, schema v1,
+  FK cascade) via `ConversationRepository`; conversations screen with
+  rename and delete (with confirmation); chat persists turns per
+  conversation. `byokai.db` holds conversation text only — never API
+  keys.
+- Documentation: rewritten `docs/PROVIDERS.md` (auth schemes,
+  endpoints, wire formats, error tables, capability flags, honest
+  limits), extended `docs/SECURITY.md` (network rules, retry/
+  cancellation, database boundary, prominent caveat), updated
+  `docs/ARCHITECTURE.md` / `docs/ROADMAP.md` / `docs/TESTING.md`.
+
+### Changed
+
+- `versionCode` 3, `versionName` 0.3.0.
+
+### Notes
+
+- Adapter tests are MockWebServer contract tests — no real provider
+  endpoints or real API keys are ever touched in tests or CI. Live
+  validation with the user's own key is a device-side step and has not
+  happened in this repository.
+- Vision and tool calling are not implemented (capability flags are
+  false); the UI never offers them.
+- The on-device Keystore test (`src/androidTest`) is written but does
+  not run in CI (Phase 5 device matrix).
+
 ## [0.2.0] — 2026-10-21
 
 Phase 2: application foundation.
@@ -83,6 +144,7 @@ Phase 1: repository and CI foundation.
   toolchain. See docs/ROADMAP.md.
 - R8/minification is deferred to Phase 5.
 
-[Unreleased]: https://github.com/Endijuan33/byokai/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Endijuan33/byokai/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Endijuan33/byokai/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Endijuan33/byokai/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Endijuan33/byokai/releases/tag/v0.1.0

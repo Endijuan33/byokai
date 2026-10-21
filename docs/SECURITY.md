@@ -1,8 +1,19 @@
-# Credential Security (Milestone 3B)
+# Credential Security (Milestone 3B, extended in 3F)
 
 How BYOKAI protects provider API keys. All code/comments are in the
 `data.security` and `domain.security` packages; the DI wiring lives in
 `di/AppContainer.kt`.
+
+> **MANDATORY HONEST CAVEAT — read this first.**
+>
+> On-device encryption does **NOT** prevent API-key extraction on a
+> compromised or rooted device, nor from the device owner. It raises the
+> bar — against casual file access, lost-device filesystem forensics,
+> and backup theft — but it is **not** a defense against a rooted
+> device, a malicious accessibility service, memory dumping, a
+> compromised app process, or the device owner themselves. Treat any key
+> entered on-device as exposed to that device. Nothing in this document
+> claims otherwise; any security review that does is wrong.
 
 ## Credential storage design
 
@@ -72,18 +83,72 @@ API keys are encrypted at rest with an envelope scheme:
 - The credential DataStore file and the Tink keyset file are excluded
   from device backups (see above).
 
-## Network rules
+## Credential redaction in errors and exceptions
 
-- Provider endpoints must be HTTPS — validated by
-  `core.network.EndpointValidator`; the validator is the gate for any
-  user-supplied base URL.
-- Authorization headers must not leak through redirects. The HTTP layer
-  (Milestone 3C) strips the `Authorization` header on cross-origin
-  redirects and follows no redirect that would downgrade HTTPS to HTTP.
-- API keys travel only as request headers over TLS; they are never placed
-  in URLs or query strings.
+`ProviderConfig` deliberately carries **no** `apiKey` field, so configs
+can be exported, logged, or displayed without exposing a secret. At the
+chat layer, `ChatRepositoryImpl` maps credential-store failures to
+generic `ProviderError`s — keystore invalidation or decryption failure
+→ `Auth("Stored API key is no longer available / could not be
+decrypted; please re-enter it")` — never the key. Adapter error
+messages are built from the provider's error envelope or a static
+`"HTTP <code>"` fallback; the key is never interpolated into a message.
+`ChatUiState.keyReady` is a map of config id → boolean: it records
+*that* a key exists, never the key itself. The providers editor keeps
+typed keystrokes in the composable's local state and hands them to
+`saveDraft`/`testDraft` only at the moment of the action, so a key
+never lingers in ViewModel state.
 
-## Honest caveat
+## Network (Phase 3, Milestones 3A/3C)
+
+- **HTTPS required.** `core.network.EndpointValidator` is the gate for
+  every user-supplied base URL and is re-run on every provider call
+  (not just at config save time). Non-HTTPS schemes are rejected;
+  cleartext HTTP is accepted **only** for loopback hosts
+  (`127.0.0.1`, `::1`, `localhost`) — for local dev servers — and is
+  flagged with a UI-visible `cleartext loopback` warning. Embedded
+  credentials (`https://user@host`) are rejected, as is the cloud
+  metadata address `169.254.169.254` (SSRF guard).
+- **No redirects.** `HttpClientFactory` sets `followRedirects(false)`
+  and `followSslRedirects(false)`: a redirect target never inherits
+  the `Authorization` header, so an API key cannot leak to a
+  third-party host via an HTTP redirect.
+- **No logging interceptor — by design.** Authorization headers and
+  request/response bodies are never logged anywhere; adding a
+  body/header logger at the HTTP layer would put API keys in logcat.
+- **Keys travel only as request headers over TLS** (`Authorization:
+  Bearer`, `x-api-key`, or `x-goog-api-key`, per adapter); never in
+  URLs or query strings, never embedded in the app.
+
+## Retry and cancellation
+
+`RetryPolicy` retries only **before** the first `ChatEvent.Delta` is
+emitted (Network, Timeout, 5xx Server, RateLimited; max 2 retries;
+exponential backoff plus the provider's `Retry-After`, capped at 30 s).
+`Auth`, `InvalidModel`, `Parse`, and other 4xx are never retried —
+they fail deterministically and a retry would only burn quota or time.
+Collector cancellation cancels the in-flight OkHttp call
+(`channel.invokeOnClose { call?.cancel() }`), unblocking the socket
+read immediately; no dangling streams keep the key in memory longer
+than needed. The read side is bounded: streams are capped at 8 MiB
+(`SseReader.MAX_BYTES`), error bodies at 64 KiB, model listings at
+1 MiB — a misbehaving server cannot force unbounded allocation.
+
+## Database (Phase 3, Milestone 3E)
+
+`byokai.db` (`data.local.db.ByokaiDatabase`, hand-rolled SQLite via
+`androidx.sqlite:sqlite-framework:2.7.1`, schema v1:
+`conversations`, `messages`, one index, FK cascade on delete) holds
+conversation text and metadata **only — NEVER API keys**. Keys live
+exclusively in the Tink-backed `CredentialStore`. The conversation
+database file is *not* encrypted by this app; anyone with filesystem
+access to the app's private storage can read conversation text. This
+is a deliberate scope boundary: the DB holds chat content the user
+already sees on screen, not secrets. If a threat model requires
+encrypted conversation history, that is a future milestone, not a
+claim made here.
+
+## Honest caveat (restated)
 
 On-device encryption raises the cost of extraction but does NOT make API
 keys unextractable from a compromised or rooted device, nor from the

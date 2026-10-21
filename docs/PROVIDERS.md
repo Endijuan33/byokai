@@ -1,40 +1,193 @@
-# Providers
+# Providers (Phase 3)
 
-## Status: NOT STARTED
+This document describes the provider system **as implemented** in Phase 3
+(milestones 3A–3E). The contract is `domain.provider.AiProvider`
+(`providerId`, `displayName`, `defaultBaseUrl`, `capabilities`,
+`listModels`, `testConnection`, `streamChat`); each adapter owns its
+auth scheme, message format, streaming protocol, and error mapping —
+never assume providers share any of these.
 
-This document is the design placeholder for the multi-provider BYOK system
-(Phase 3). No provider code exists yet. Nothing below is implemented.
+Adapters in `AppContainer.providerRegistry` (all share one
+`OkHttpClient` from `core.network.HttpClientFactory`, `Dispatchers.IO`
+for streaming):
 
-## Goals
+- `OpenAiAdapter` — OpenAI Chat Completions API
+- `AnthropicAdapter` — Anthropic Messages API
+- `GeminiAdapter` — Google Gemini Generative Language API
 
-- One shared `ProviderAdapter` interface; one adapter implementation per
-  provider (OpenAI, Anthropic, Google Gemini, DeepSeek, xAI, OpenRouter,
-  generic OpenAI-compatible endpoints).
-- Capability detection: UI only offers features (streaming, tool calling,
-  vision, audio) the configured provider + model actually support.
-- Per-conversation provider/model selection, per-provider settings, connection
-  testing, and safe error surfacing.
+The shared core (`core.network`) every adapter uses:
 
-## Non-goals for adapters
+- `SseReader` — Server-Sent Events framing (skips `:comment` keep-alive
+  lines, joins multi-line `data:` fields, ignores `id:`/`retry:`;
+  dispatches a trailing event when EOF arrives without a final blank
+  line). Hard stream cap: **8 MiB** (`MAX_BYTES`); exceeding it fails
+  the stream.
+- `RetryPolicy` — retries **only before the first `ChatEvent.Delta` is
+  emitted** (retrying after partial output would duplicate text the
+  caller already delivered; once the stream has started, every failure
+  is terminal). Retryable: `Network`, `Timeout`, 5xx `Server`,
+  `RateLimited`. Never retried: `Auth`, `InvalidModel`, `Parse`, other
+  4xx. At most **2 retries** after the initial attempt; backoff is
+  `1000ms × 2^attempt` plus the provider's `Retry-After` hint (seconds,
+  capped at 30 s).
+- `ProviderJson` — shared lenient kotlinx.serialization `Json`:
+  `ignoreUnknownKeys = true`, `explicitNulls = false`,
+  `encodeDefaults = true` (serialization 1.12.0 defaults this to
+  `false`, which would silently drop e.g. OpenAI's `stream: true`).
+- Transport defaults: 15 s connect, **60 s read** (streams stay open),
+  15 s write. Redirects are disabled; error bodies are capped at 64 KiB
+  and model listings at 1 MiB.
 
-- Never assume providers share auth schemes, message formats, streaming
-  protocols, tool-call schemas, or error shapes. Each adapter owns its mapping.
-- No API key is ever embedded in the app, logged, or sent anywhere except the
-  provider endpoint the user configured.
+Chat protocol (`domain.chat`): `streamChat` returns a cold `Flow` of
+`ChatEvent` — zero or more `Delta(text)` chunks, then exactly one
+terminal event: `Done(fullText)` on success or `Error(ProviderError)`
+on failure. The flow never throws; collector cancellation cancels the
+in-flight HTTP call (via `SendChannel.invokeOnClose`), unblocking the
+socket read. `ChatRepositoryImpl` resolves each request in order —
+config must exist → `modelId` must be one of the config's `modelIds` →
+a key must be stored (missing/keystore-invalid/decrypt-fail → `Auth`;
+other storage failures → `Network`) → an adapter must be registered
+for the config's `ProviderId` — each failure emitted as a single
+terminal `Error`.
 
-## Credential storage (security-critical)
+`ProviderConfig` invariants (enforced by `validate()` and by
+`DataStoreProviderConfigRepository` on the write path): non-blank
+`displayName`; `baseUrl` passing `EndpointValidator`; non-empty
+`modelIds`; `defaultModelId` (when set) ∈ `modelIds`. Configs carry **no
+API key** — keys live only in the `CredentialStore` keyed by config id.
 
-- API keys are encrypted at rest with keys held in the Android Keystore
-  (Tink is the planned primitive; `com.google.crypto.tink:tink-android:1.24.0`
-  is already in the version catalog).
-- Encrypted stores are excluded from device backups (see
-  `res/xml/backup_rules.xml` and `SECURITY.md`).
-- Documented limitation: on-device encryption raises the bar but cannot make
-  keys unextractable from a compromised device.
+## OpenAI
 
-## Planned validation (Phase 3 acceptance)
+- **Auth**: `Authorization: Bearer <apiKey>` header; key never logged,
+  never stored outside the credential store, never in error messages.
+- **Base URL** (default): `https://api.openai.com`.
+- **Chat**: `POST {baseUrl}/v1/chat/completions`, body
+  `{model, messages, stream: true}`. System prompt goes first as role
+  `"system"`; domain roles map `SYSTEM→"system"`, `USER→"user"`,
+  `ASSISTANT→"assistant"`.
+- **Streaming wire format**: SSE `data:` lines; each payload is
+  `{choices: [{delta: {content: "..."}}]}`; text chunks → `Delta`.
+  Terminal sentinel: `data: [DONE]` → `Done`. EOF without `[DONE]` is a
+  `Parse` error (`"stream ended without [DONE]"`).
+- **Error envelope**: `{"error": {"message": "..."}}`, best-effort;
+  falls back to `"HTTP <code>"`.
+- **listModels**: `GET {baseUrl}/v1/models`; blank ids filtered out.
+- **testConnection**: cheap `GET {baseUrl}/v1/models` — no model call,
+  so no quota burn beyond the listing call itself.
 
-- Adapter contract tests with recorded HTTP fixtures per provider.
-- Credential redaction tests on logs.
-- Streaming, cancellation, timeout, retry, auth-failure, and rate-limit tests.
-- UI tests for add/edit/delete/test of provider configurations.
+## OpenAI-compatible endpoints
+
+Served by `OpenAiAdapter` with a user-supplied `baseUrl` — the wire
+protocol is the OpenAI shape above, so any compatible server works. The
+base URL is re-validated by `EndpointValidator` **on every call** (HTTPS
+required; cleartext HTTP only for loopback hosts
+`127.0.0.1`/`::1`/`localhost`, flagged with a UI-visible warning;
+embedded credentials (`user@host`) rejected; the cloud metadata address
+`169.254.169.254` rejected). Custom servers are expected to implement
+`GET /v1/models` for listing and connection testing; `data: [DONE]`
+must terminate the stream.
+
+## Anthropic
+
+- **Auth**: `x-api-key: <apiKey>` header (plus the required
+  `anthropic-version: 2023-06-01` header); key never logged, never
+  stored outside the credential store, never in error messages.
+- **Base URL** (default): `https://api.anthropic.com`.
+- **Chat**: `POST {baseUrl}/v1/messages`, body
+  `{model, max_tokens, stream: true, system?, messages}`.
+  - `max_tokens` is **required by the API (no server default)**; chat
+    uses **1024** — a deliberately modest generation ceiling that bounds
+    accidental quota burn while still allowing typical chat answers to
+    stream incrementally.
+  - Anthropic has no `"system"` message role: the system prompt plus any
+    `SYSTEM`-role turns are joined with blank lines into the top-level
+    `system` field; `messages` carries user/assistant turns only.
+- **Streaming wire format** (tracked by `event:` name):
+  - `content_block_delta` → `data.delta.text` accumulated and emitted
+    as `Delta` per non-empty chunk.
+  - `message_stop` → `Done` with the accumulated text.
+  - `error` → SSE error envelope parsed and mapped by type (see below).
+  - Everything else (`message_start`, `content_block_start`,
+    `content_block_stop`, `message_delta`, `ping`, …) is ignored.
+  - There is **no `[DONE]` sentinel**: clean EOF without
+    `message_stop` completes the stream (`Done`) — Anthropic closes it
+    cleanly, so this is not a parse failure.
+- **Error envelope**: `{"type": "error", "error": {"message": ...}}`.
+  SSE `error` events map by Anthropic type:
+  `authentication_error`/`permission_error` → `Auth`,
+  `rate_limit_error` → `RateLimited`, `not_found_error` →
+  `InvalidModel`, anything else → `Server`.
+- **listModels**: Anthropic exposes **no model-listing endpoint**, so per
+  the contract this returns the config's known `modelIds` as `ModelInfo`
+  entries — no network call, no quota burn.
+- **testConnection**: a minimal **real** non-streaming
+  `POST {baseUrl}/v1/messages` (`max_tokens: 1`, one one-word user
+  message) against the config's `defaultModelId` (falling back to the
+  first `modelId`); fails with `Config` when no model id is configured.
+  **Quota note**: unlike the OpenAI/Gemini listing-based tests, this
+  performs an actual model call — tiny (one output token), but it burns
+  a small amount of quota on every test. There is no cheaper way to
+  verify an Anthropic key, and no automatic connection test runs on
+  page open.
+
+## Google Gemini
+
+- **Auth**: `x-goog-api-key: <apiKey>` header (Gemini does not use
+  `Authorization: Bearer`); key never logged, never stored outside the
+  credential store, never in error messages.
+- **Base URL** (default): `https://generativelanguage.googleapis.com`.
+- **Chat**: `POST {baseUrl}/v1beta/models/{modelId}:streamGenerateContent?alt=sse`,
+  where `{modelId}` is percent-encoded for path use (plain model ids
+  pass through untouched). Body `{contents, systemInstruction?}`: turns
+  become `contents` with `USER→"user"` and `ASSISTANT→"model"` roles
+  (Gemini's contents API accepts only those two); the system prompt plus
+  any `SYSTEM`-role turns fold into `systemInstruction`.
+- **Streaming wire format**: SSE `data:` lines; text is the
+  concatenation of `candidates[0].content.parts[].text` per chunk
+  (chunks without candidates — e.g. `promptFeedback`-only — contribute
+  nothing). There is **no `[DONE]` sentinel**: clean EOF → `Done`.
+- **Error envelope**: `{"error": {"message": "..."}}`, best-effort;
+  falls back to `"HTTP <code>"`.
+- **listModels**: `GET {baseUrl}/v1beta/models`; resource names like
+  `"models/gemini-2.0-flash"` have the `"models/"` prefix stripped so
+  the id is what `:streamGenerateContent` expects.
+- **testConnection**: cheap `GET {baseUrl}/v1beta/models` — no model
+  call, so no quota burn beyond the listing call itself.
+
+## Error normalization (all adapters)
+
+| HTTP status | `ProviderError` | Notes |
+|---|---|---|
+| 401, 403 | `Auth` | wrong/missing key; never retried |
+| 429 | `RateLimited(message, retryAfterSeconds)` | `Retry-After` parsed as seconds when present |
+| 404 | `InvalidModel` | unknown/inaccessible model id |
+| 5xx, anything else | `Server(statusCode, message)` | 5xx retried pre-Delta per `RetryPolicy` |
+
+Non-HTTP errors: `Timeout` (socket timeout), `Network(cause)`
+(transport failure), `Parse` (malformed payload), `Config` (missing
+config / unregistered provider / invalid endpoint). Error messages come
+from the provider's envelope on a best-effort basis and **never contain
+the API key**.
+
+## Capability flags
+
+| Capability | OpenAI | Anthropic | Gemini |
+|---|---|---|---|
+| `streaming` | ✅ | ✅ | ✅ |
+| `systemPrompt` | ✅ | ✅ (top-level `system` field) | ✅ (`systemInstruction`) |
+| `modelListing` | ✅ (`GET /v1/models`) | ❌ (no endpoint — returns config `modelIds`) | ✅ (`GET /v1beta/models`) |
+| `vision` | ❌ | ❌ | ❌ |
+| `toolCalling` | ❌ | ❌ | ❌ |
+
+## Honest limits
+
+- **Text-only.** No vision/image input and no tool/function calling are
+  implemented in any adapter; the capability flags exist precisely so
+  the UI never offers these.
+- Streaming is the only completion mode; there is no non-streaming chat
+  path besides Anthropic's connection test.
+- Adapter unit tests use scripted MockWebServer fixtures (see
+  [TESTING.md](TESTING.md)), not live provider endpoints — behavior
+  against real servers is verified only with the user's own key on
+  their own device. Real-key testing never happens in CI or in this
+  repository.
