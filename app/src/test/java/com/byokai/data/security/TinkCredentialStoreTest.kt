@@ -5,8 +5,8 @@ import com.byokai.domain.security.CredentialException
 import com.byokai.domain.security.CredentialStore
 import com.google.crypto.tink.Aead
 import com.google.crypto.tink.KeysetHandle
-import com.google.crypto.tink.aead.AeadConfig
-import com.google.crypto.tink.aead.AeadKeyTemplates
+import com.google.crypto.tink.aead.AeadConfig2026
+import com.google.crypto.tink.aead.PredefinedAeadParameters
 import java.util.Base64
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -42,11 +42,14 @@ class TinkCredentialStoreTest {
     }
 
     private fun ephemeralAead(): Aead {
-        // Tink key managers must be registered before any primitive use;
-        // register() is idempotent so calling it per-test is safe.
-        AeadConfig.register()
-        return KeysetHandle.generateNew(AeadKeyTemplates.AES256_GCM)
-            .getPrimitive(Aead::class.java)
+        // Explicit Configuration (Tink's documented API): the global
+        // RegistryConfiguration is unreliable in tests because both the
+        // `tink` and `tink-android` artifacts are on the classpath, so the
+        // Configuration is passed explicitly instead of relying on global
+        // registration.
+        val config = AeadConfig2026.get()
+        return KeysetHandle.generateNew(PredefinedAeadParameters.AES256_GCM, config)
+            .getPrimitive(config, Aead::class.java)
     }
 
     private fun ephemeralProvider(aead: Aead = ephemeralAead()) =

@@ -4,6 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import com.google.crypto.tink.Aead
 import com.google.crypto.tink.aead.AeadConfig
+import com.google.crypto.tink.aead.AeadConfig2026
 import com.google.crypto.tink.aead.AeadKeyTemplates
 import com.google.crypto.tink.integration.android.AndroidKeysetManager
 
@@ -30,10 +31,13 @@ class AndroidKeysetAeadProvider(context: Context) : AeadProvider {
     private val appContext = context.applicationContext
 
     override fun get(): Aead {
-        // Tink key managers must be registered before any primitive use.
-        // register() is idempotent; without it every encrypt/decrypt throws
-        // "No key manager found" (GeneralSecurityException).
+        // Populates the global registries consulted by AndroidKeysetManager's
+        // internal KeysetHandle.generateNew(keyTemplate). Idempotent; without
+        // it every encrypt/decrypt throws "No key manager found".
         AeadConfig.register()
+        // Explicit Configuration for the primitive lookup (Tink's documented
+        // API) instead of relying on the global RegistryConfiguration.
+        val config = AeadConfig2026.get()
         val aead = try {
             AndroidKeysetManager.Builder()
                 .withSharedPref(appContext, KEYSET_NAME, KEYSET_PREFS_FILE)
@@ -41,7 +45,7 @@ class AndroidKeysetAeadProvider(context: Context) : AeadProvider {
                 .withMasterKeyUri(MASTER_KEY_URI)
                 .build()
                 .keysetHandle
-                .getPrimitive(Aead::class.java)
+                .getPrimitive(config, Aead::class.java)
         } catch (e: Exception) {
             throw findInvalidation(e)?.let { KeyInvalidatedException(it) } ?: e
         }
