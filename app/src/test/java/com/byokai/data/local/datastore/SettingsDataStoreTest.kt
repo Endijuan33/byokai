@@ -1,7 +1,7 @@
 package com.byokai.data.local.datastore
 
 import androidx.datastore.core.DataStoreFactory
-import androidx.datastore.preferences.core.PreferencesSerializer
+import androidx.datastore.preferences.core.PreferencesFileSerializer
 import com.byokai.core.common.Result
 import com.byokai.domain.model.AppLanguage
 import com.byokai.domain.model.ThemeMode
@@ -29,9 +29,11 @@ class SettingsDataStoreTest {
     fun setUp() {
         testFile = File.createTempFile("byokai-settings-test", ".preferences_pb")
         testFile.delete()
+        // PreferencesFileSerializer is the classic file-based Serializer
+        // explicitly documented for manual DataStore creation in tests.
         dataStore = SettingsDataStore(
             DataStoreFactory.create(
-                serializer = PreferencesSerializer,
+                serializer = PreferencesFileSerializer,
                 produceFile = { testFile },
             ),
         )
