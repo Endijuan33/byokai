@@ -5,7 +5,6 @@ import com.byokai.data.local.datastore.SettingsDataStoreHolder
 import com.byokai.data.repository.SettingsRepositoryImpl
 import com.byokai.data.security.AndroidKeysetAeadProvider
 import com.byokai.data.security.CredentialStorageHolder
-import com.byokai.data.security.DataStoreCredentialStorage
 import com.byokai.data.security.TinkCredentialStore
 import com.byokai.domain.repository.SettingsRepository
 import com.byokai.domain.security.CredentialStore
@@ -42,7 +41,7 @@ class AppContainer(context: Context) {
     val credentialStore: CredentialStore by lazy {
         TinkCredentialStore(
             AndroidKeysetAeadProvider(appContext),
-            DataStoreCredentialStorage(CredentialStorageHolder.get(appContext)),
+            CredentialStorageHolder.get(appContext),
         )
     }
 }
