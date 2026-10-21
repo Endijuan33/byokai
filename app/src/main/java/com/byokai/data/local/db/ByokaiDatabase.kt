@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
+import com.byokai.data.local.db.migration.MigrationRunner
+import com.byokai.data.local.db.migration.MigrationV1ToV2
 
 /**
  * Process-wide access to the BYOKAI SQLite database (`byokai.db`).
@@ -14,20 +16,30 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
  * [FrameworkSQLiteOpenHelperFactory]. No Room — KSP has no 2.4.x release
  * for Kotlin 2.4.21, so all SQL here is hand-rolled.
  *
- * Schema (version 1):
+ * Schema (version 2):
  * - `conversations(id TEXT PRIMARY KEY, title TEXT, created_at INTEGER,
- *   updated_at INTEGER)`
+ *   updated_at INTEGER, system_prompt TEXT)` — `system_prompt` added in
+ *   v2 (Milestone 4A) for per-conversation system instructions; NULL
+ *   for pre-existing rows.
  * - `messages(id TEXT PRIMARY KEY, conversation_id TEXT REFERENCES
  *   conversations(id) ON DELETE CASCADE, role TEXT, content TEXT,
  *   created_at INTEGER, is_partial INTEGER DEFAULT 0)`
+ * - `prompts(id TEXT PRIMARY KEY, title TEXT, content TEXT, is_builtin
+ *   INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER)` — added
+ *   in v2 (Milestone 4A) for reusable prompt templates; starts empty,
+ *   seeded by the repository layer, not by the migration.
  * - index `idx_messages_conversation` on `messages(conversation_id,
  *   created_at)`.
  *
  * Foreign-key constraints are enabled in [onConfigure], so deleting a
  * conversation cascades to its messages.
  *
- * Version 1 has NO migration yet ([onUpgrade] is a documented no-op);
- * the first schema change must add a real migration path.
+ * Migrations are version-chained and transactional: [onUpgrade]
+ * delegates to [MigrationRunner], which applies every registered
+ * migration between the old and new versions inside a single
+ * transaction. A missing migration fails fast and rolls back rather
+ * than leaving a half-migrated database. Destructive migrations are
+ * forbidden — conversation history is user data.
  *
  * Security boundary: API keys are NEVER stored in this database. The
  * tables hold conversation text and metadata only; provider config ids
@@ -38,7 +50,16 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 object ByokaiDatabase {
 
     const val DATABASE_NAME = "byokai.db"
-    const val DATABASE_VERSION = 1
+    const val DATABASE_VERSION = 2
+
+    /**
+     * Every schema migration ever shipped, in version order. The runner
+     * walks the chain; keep this list append-only — never remove or
+     * reorder entries, or upgrades from old installs break.
+     */
+    private val migrations = listOf(
+        MigrationV1ToV2,
+    )
 
     @Volatile
     private var instance: SupportSQLiteOpenHelper? = null
@@ -63,6 +84,10 @@ object ByokaiDatabase {
             db.setForeignKeyConstraintsEnabled(true)
         }
 
+        /**
+         * Creates the CURRENT schema (v2) directly. Fresh installs never
+         * run migrations; [onUpgrade] handles existing v1 databases.
+         */
         override fun onCreate(db: SupportSQLiteDatabase) {
             db.execSQL(
                 """
@@ -70,7 +95,8 @@ object ByokaiDatabase {
                     id TEXT PRIMARY KEY NOT NULL,
                     title TEXT NOT NULL,
                     created_at INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL
+                    updated_at INTEGER NOT NULL,
+                    system_prompt TEXT
                 )
                 """.trimIndent(),
             )
@@ -87,22 +113,34 @@ object ByokaiDatabase {
                 """.trimIndent(),
             )
             db.execSQL(
+                """
+                CREATE TABLE prompts (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    title TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    is_builtin INTEGER NOT NULL DEFAULT 0,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
                 "CREATE INDEX idx_messages_conversation " +
                     "ON messages(conversation_id, created_at)",
             )
         }
 
-        /**
-         * No migration yet: version 1 is the first schema. The first
-         * schema change MUST implement a real migration here instead of
-         * dropping tables — conversation history is user data.
-         */
         override fun onUpgrade(
             db: SupportSQLiteDatabase,
             oldVersion: Int,
             newVersion: Int,
         ) {
-            // Intentional no-op for v1.
+            MigrationRunner.migrate(
+                SupportDbHandle(db),
+                migrations,
+                oldVersion,
+                newVersion,
+            )
         }
     }
 }

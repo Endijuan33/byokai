@@ -41,6 +41,13 @@ interface ConversationRepository {
     /** Replaces the conversation title. */
     suspend fun rename(id: String, title: String): Result<Unit>
 
+    /**
+     * Sets (or clears, when null) the conversation's system prompt.
+     * Stored as nullable TEXT; sent to the provider via the adapter's
+     * system-prompt channel, never as a user message.
+     */
+    suspend fun setSystemPrompt(id: String, systemPrompt: String?): Result<Unit>
+
     /** Messages of one conversation, ordered by `createdAt` ascending. */
     fun messages(conversationId: String): Flow<List<Message>>
 

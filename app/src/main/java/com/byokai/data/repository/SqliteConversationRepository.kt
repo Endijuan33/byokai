@@ -54,7 +54,7 @@ class SqliteConversationRepository(
     override suspend fun get(id: String): Conversation? =
         withContext(Dispatchers.IO) {
             helper.readableDatabase.query(
-                "SELECT id, title, created_at, updated_at FROM conversations WHERE id = ?",
+                "SELECT id, title, created_at, updated_at, system_prompt FROM conversations WHERE id = ?",
                 arrayOf<Any?>(id),
             ).use { cursor ->
                 if (!cursor.moveToFirst()) return@withContext null
@@ -63,6 +63,7 @@ class SqliteConversationRepository(
                     title = cursor.getString(cursor.getColumnIndexOrThrow("title")),
                     createdAt = cursor.getLong(cursor.getColumnIndexOrThrow("created_at")),
                     updatedAt = cursor.getLong(cursor.getColumnIndexOrThrow("updated_at")),
+                    systemPrompt = readNullableString(cursor, "system_prompt"),
                 )
             }
         }
@@ -90,6 +91,13 @@ class SqliteConversationRepository(
         helper.writableDatabase.execSQL(
             "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?",
             arrayOf<Any?>(title, System.currentTimeMillis(), id),
+        )
+    }
+
+    override suspend fun setSystemPrompt(id: String, systemPrompt: String?): Result<Unit> = ioWrite {
+        helper.writableDatabase.execSQL(
+            "UPDATE conversations SET system_prompt = ?, updated_at = ? WHERE id = ?",
+            arrayOf<Any?>(systemPrompt, System.currentTimeMillis(), id),
         )
     }
 
@@ -164,12 +172,13 @@ class SqliteConversationRepository(
 
     private fun queryConversations(): List<Conversation> =
         helper.readableDatabase.query(
-            "SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC",
+            "SELECT id, title, created_at, updated_at, system_prompt FROM conversations ORDER BY updated_at DESC",
         ).use { cursor ->
             val idIdx = cursor.getColumnIndexOrThrow("id")
             val titleIdx = cursor.getColumnIndexOrThrow("title")
             val createdIdx = cursor.getColumnIndexOrThrow("created_at")
             val updatedIdx = cursor.getColumnIndexOrThrow("updated_at")
+            val promptIdx = cursor.getColumnIndexOrThrow("system_prompt")
             buildList {
                 while (cursor.moveToNext()) {
                     add(
@@ -178,11 +187,25 @@ class SqliteConversationRepository(
                             title = cursor.getString(titleIdx),
                             createdAt = cursor.getLong(createdIdx),
                             updatedAt = cursor.getLong(updatedIdx),
+                            systemPrompt = if (cursor.isNull(promptIdx)) null
+                            else cursor.getString(promptIdx),
                         ),
                     )
                 }
             }
         }
+
+    /**
+     * Nullable TEXT read that tolerates the column holding SQL NULL
+     * (pre-migration rows always do).
+     */
+    private fun readNullableString(
+        cursor: android.database.Cursor,
+        column: String,
+    ): String? {
+        val idx = cursor.getColumnIndexOrThrow(column)
+        return if (cursor.isNull(idx)) null else cursor.getString(idx)
+    }
 
     private fun queryMessages(conversationId: String): List<Message> =
         helper.readableDatabase.query(
