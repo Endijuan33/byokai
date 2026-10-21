@@ -32,6 +32,10 @@ import kotlinx.coroutines.flow.flow
  * [ChatEvent.Error]. Preventing duplicate sends is the UI layer's job
  * (the send control stays disabled while a generation is in flight).
  *
+ * A successful-but-empty completion ([ChatEvent.Done] with blank text)
+ * is normalized to [ChatEvent.Error] with [ProviderError.EmptyResponse]
+ * so callers never have to render or persist an empty bubble.
+ *
  * No key material is included in errors or logs — only static messages
  * and non-secret identifiers.
  */
@@ -67,7 +71,13 @@ class ChatRepositoryImpl(
                 emit(ChatEvent.Error(ProviderError.Config("No adapter registered for provider")))
                 return@flow
             }
-        adapter.streamChat(config, apiKey, request).collect { emit(it) }
+        adapter.streamChat(config, apiKey, request).collect { event ->
+            if (event is ChatEvent.Done && event.fullText.isBlank()) {
+                emit(ChatEvent.Error(ProviderError.EmptyResponse))
+            } else {
+                emit(event)
+            }
+        }
     }
 
     private fun mapCredentialError(cause: Throwable): ProviderError = when (cause) {

@@ -302,4 +302,41 @@ class ChatPersistenceTest {
             assertEquals(0, conversations.deleteCount)
             assertEquals(id, vm.uiState.value.conversationId)
         }
+
+    @Test
+    fun `stop then send keeps database turn order`() = runTest(testDispatcher) {
+        val chatRepo = FakeChatRepository(events = listOf(ChatEvent.Delta("partial")))
+        val conversations = FakeConversationRepository()
+        val vm = readyViewModel(chatRepo, conversations)
+        vm.newConversation("New conversation")
+        advanceUntilIdle()
+
+        vm.updateInput("first")
+        vm.send()!!.join()
+        advanceUntilIdle()
+        // The stream ended after one delta with no terminal event;
+        // stop() persists the partial text.
+        vm.stop()
+
+        chatRepo.events = listOf(ChatEvent.Done("second reply"))
+        vm.updateInput("second")
+        vm.send()!!.join()
+        advanceUntilIdle()
+
+        val ordered = conversations.appendedMessages.map { it.role to it.content }
+        assertEquals(
+            listOf(
+                ChatRole.USER to "first",
+                ChatRole.ASSISTANT to "partial",
+                ChatRole.USER to "second",
+                ChatRole.ASSISTANT to "second reply",
+            ),
+            ordered,
+        )
+        // The persisted partial stays marked partial; the completed
+        // turn does not.
+        val partials = conversations.appendedMessages.filter { it.isPartial }
+        assertEquals(1, partials.size)
+        assertEquals("partial", partials.single().content)
+    }
 }

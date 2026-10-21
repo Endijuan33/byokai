@@ -270,6 +270,71 @@ class ChatViewModelTest {
         }
 
     @Test
+    fun `rapid double send is claimed once synchronously`() =
+        runTest(testDispatcher) {
+            val chatRepo = FakeChatRepository(
+                events = listOf(ChatEvent.Done("Hi there")),
+            )
+            val vm = readyViewModel(chatRepo)
+
+            vm.updateInput("one")
+            val first = vm.send()
+            // No dispatcher advance: the second call must be rejected by
+            // the synchronous claim, before any coroutine runs.
+            val second = vm.send()
+            assertNotNull(first)
+            assertNull(second)
+            first!!.join()
+            advanceUntilIdle()
+
+            assertEquals(1, chatRepo.callCount)
+            assertEquals(
+                1,
+                vm.uiState.value.messages.count { it.role == ChatRole.USER },
+            )
+            assertFalse(vm.uiState.value.generating)
+        }
+
+    @Test
+    fun `selectConfig stops an in-flight stream`() = runTest(testDispatcher) {
+        val chatRepo = FakeChatRepository(hangForever = true)
+        val repo = InMemoryConfigRepo(listOf(config("cfg-1"), config("cfg-2")))
+        val store = FakeCredentialStore()
+        store.save("cfg-1", "sk-1")
+        store.save("cfg-2", "sk-2")
+        val vm = ChatViewModel(chatRepo, repo, store)
+        advanceUntilIdle()
+
+        vm.updateInput("one")
+        vm.send()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.generating)
+
+        vm.selectConfig("cfg-2")
+
+        assertFalse(vm.uiState.value.generating)
+        assertEquals("cfg-2", vm.uiState.value.selectedConfigId)
+        // The partial turn is kept, still pending.
+        assertEquals(1, vm.uiState.value.messages.count { it.isPending })
+    }
+
+    @Test
+    fun `selectModel stops an in-flight stream`() = runTest(testDispatcher) {
+        val chatRepo = FakeChatRepository(hangForever = true)
+        val vm = readyViewModel(chatRepo)
+
+        vm.updateInput("one")
+        vm.send()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.generating)
+
+        vm.selectModel("m-1")
+
+        assertFalse(vm.uiState.value.generating)
+        assertEquals("m-1", vm.uiState.value.selectedModelId)
+    }
+
+    @Test
     fun `dismissError clears the banner`() = runTest(testDispatcher) {
         val chatRepo = FakeChatRepository(
             events = listOf(ChatEvent.Error(ProviderError.Timeout)),

@@ -36,6 +36,13 @@ sealed interface ProviderError {
     data class Parse(val message: String) : ProviderError
 
     /**
+     * The provider returned a successful but empty completion (no text
+     * at all). Surfaced instead of an empty message bubble so the UI
+     * can explain and offer a retry.
+     */
+    data object EmptyResponse : ProviderError
+
+    /**
      * The request could not be routed: the provider configuration is
      * missing, or no adapter is registered for its provider family.
      */

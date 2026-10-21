@@ -37,6 +37,7 @@
     <string name="error_provider_invalid_model">Model "%1$s" is not available with this key.</string>
     <string name="error_provider_server">Provider error (HTTP %1$d): %2$s</string>
     <string name="error_provider_parse">Could not read the provider\'s response: %1$s</string>
+    <string name="error_provider_empty_response">The provider returned an empty response. Try again or rephrase your message.</string>
     <string name="error_provider_config">Configuration problem: %1$s</string>
 
     <!-- Home additions -->

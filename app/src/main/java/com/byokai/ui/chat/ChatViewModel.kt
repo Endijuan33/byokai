@@ -152,6 +152,13 @@ class ChatViewModel(
 
     private var streamJob: Job? = null
 
+    /**
+     * The in-flight partial-turn persist started by [stop], if any.
+     * [send] joins it before persisting the new user turn so the
+     * database keeps turn order across a stop/send sequence.
+     */
+    private var partialPersistJob: Job? = null
+
     init {
         viewModelScope.launch {
             configRepository.configs().collect { configs ->
@@ -195,9 +202,18 @@ class ChatViewModel(
         _uiState.update { it.copy(input = text) }
     }
 
-    /** Selects a provider config; the model resets to its default. */
+    /**
+     * Selects a provider config; the model resets to its default.
+     *
+     * An in-flight stream is stopped first: it belongs to the previous
+     * config, and continuing it while the UI shows the new selection
+     * would be misleading. The partial text is kept (persisted when a
+     * conversation is active).
+     */
     fun selectConfig(configId: String) {
+        if (_uiState.value.selectedConfigId == configId) return
         val config = _uiState.value.configs.firstOrNull { it.id == configId } ?: return
+        stop()
         _uiState.update {
             it.copy(
                 selectedConfigId = configId,
@@ -207,8 +223,16 @@ class ChatViewModel(
         }
     }
 
-    /** Selects the model for the current config. */
+    /**
+     * Selects the model for the current config.
+     *
+     * Stops an in-flight stream first, for the same reason as
+     * [selectConfig]: the stream in flight was requested with the
+     * previous model.
+     */
     fun selectModel(modelId: String) {
+        if (_uiState.value.selectedModelId == modelId) return
+        stop()
         _uiState.update { it.copy(selectedModelId = modelId, error = null) }
     }
 
@@ -374,11 +398,14 @@ class ChatViewModel(
     /**
      * Sends the current input.
      *
-     * Guarded by [ChatUiState.canSend]; a second call while [generating]
-     * is ignored (returns null). With an active conversation the user
-     * turn is persisted before the stream starts, and the conversation
-     * is created first when needed; a failed write aborts the send with
-     * an error banner.
+     * The send is claimed synchronously (compare-and-set on
+     * [ChatUiState.canSend]): a second call — e.g. a fast double tap —
+     * cannot slip through before the coroutine starts, so the user turn
+     * is persisted exactly once and only one stream starts. A failed
+     * claim returns null. With an active conversation the user turn is
+     * persisted before the stream starts, and the conversation is
+     * created first when needed; a failed write aborts the send with an
+     * error banner and releases the claim.
      *
      * Returns the launched [Job]. Joining it waits until persistence is
      * done and the stream has STARTED — not until the stream completes;
@@ -386,18 +413,35 @@ class ChatViewModel(
      * `advanceUntilIdle()` for full completion).
      */
     fun send(): Job? {
-        val state = _uiState.value
-        if (!state.canSend) return null
-        val userText = state.input.trim()
+        val userText = _uiState.value.input.trim()
         if (userText.isBlank()) return null
+        var claimed = false
+        _uiState.update { state ->
+            if (state.canSend) {
+                claimed = true
+                state.copy(input = "", generating = true)
+            } else {
+                state
+            }
+        }
+        if (!claimed) return null
         return viewModelScope.launch {
+            // A stop() immediately before this send may still be
+            // persisting its partial turn; wait for it so the database
+            // keeps turn order (partial before the new user turn).
+            partialPersistJob?.join()
+            partialPersistJob = null
             val repository = conversationRepository
             val conversationId = if (repository == null) {
                 null // In-memory mode: no persistence.
             } else {
-                ensureConversation() ?: return@launch
+                ensureConversation() ?: run {
+                    _uiState.update { it.copy(generating = false) }
+                    return@launch
+                }
             }
             if (conversationId != null && !persistUserMessage(conversationId, userText)) {
+                _uiState.update { it.copy(generating = false) }
                 return@launch
             }
             if (conversationId != null) {
@@ -405,7 +449,6 @@ class ChatViewModel(
             }
             _uiState.update {
                 it.copy(
-                    input = "",
                     messages = it.messages +
                         ChatUiMessage(ChatRole.USER, userText, isPending = false),
                 )
@@ -438,12 +481,14 @@ class ChatViewModel(
      * Cancels the in-flight stream. The partial assistant message stays
      * in the list, still marked pending — the text received so far is
      * real stream output and is not discarded. With an active
-     * conversation the partial text is persisted as a partial message.
+     * conversation the partial text is persisted as a partial message;
+     * the persist job is tracked so a subsequent [send] can wait for it
+     * and keep database turn order.
      */
     fun stop() {
         streamJob?.cancel()
         streamJob = null
-        persistPartialNow()
+        partialPersistJob = persistPartialNow()
         _uiState.update { it.copy(generating = false) }
     }
 
@@ -540,16 +585,17 @@ class ChatViewModel(
     /**
      * Persists the trailing pending assistant turn's current text as a
      * partial message, if there is an active conversation and non-empty
-     * text. Fire-and-forget: a failed write surfaces as an error banner.
+     * text. Returns the launched [Job], or null when there is nothing to
+     * persist. A failed write surfaces as an error banner.
      */
-    private fun persistPartialNow() {
-        val conversationId = _uiState.value.conversationId ?: return
-        val repository = conversationRepository ?: return
+    private fun persistPartialNow(): Job? {
+        val conversationId = _uiState.value.conversationId ?: return null
+        val repository = conversationRepository ?: return null
         val partial = _uiState.value.messages
             .lastOrNull { it.role == ChatRole.ASSISTANT && it.isPending }
             ?.text.orEmpty()
-        if (partial.isEmpty()) return
-        viewModelScope.launch {
+        if (partial.isEmpty()) return null
+        return viewModelScope.launch {
             if (repository.appendMessage(
                     conversationId,
                     ChatRole.ASSISTANT,

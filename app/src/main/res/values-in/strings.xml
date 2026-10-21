@@ -37,6 +37,7 @@
     <string name="error_provider_invalid_model">Model "%1$s" tidak tersedia dengan kunci ini.</string>
     <string name="error_provider_server">Kesalahan provider (HTTP %1$d): %2$s</string>
     <string name="error_provider_parse">Tidak dapat membaca respons provider: %1$s</string>
+    <string name="error_provider_empty_response">Provider mengembalikan respons kosong. Coba lagi atau ubah pesan Anda.</string>
     <string name="error_provider_config">Masalah konfigurasi: %1$s</string>
 
     <!-- Home additions -->

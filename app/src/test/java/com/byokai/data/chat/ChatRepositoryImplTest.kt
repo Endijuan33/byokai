@@ -181,6 +181,30 @@ class ChatRepositoryImplTest {
     }
 
     @Test
+    fun `blank Done maps to Error with EmptyResponse`() = runTest {
+        val (impl, _) = repository(
+            adapter = FakeAdapter(listOf(ChatEvent.Done("   "))),
+        )
+
+        val collected = impl.streamChat(request()).toList()
+
+        assertEquals(1, collected.size)
+        val error = collected.single() as ChatEvent.Error
+        assertTrue(error.error is ProviderError.EmptyResponse)
+    }
+
+    @Test
+    fun `non-blank Done passes through untouched`() = runTest {
+        val (impl, _) = repository(
+            adapter = FakeAdapter(listOf(ChatEvent.Done("Hello"))),
+        )
+
+        val collected = impl.streamChat(request()).toList()
+
+        assertEquals(listOf(ChatEvent.Done("Hello")), collected)
+    }
+
+    @Test
     fun `invalidated credential key emits Error with Auth`() = runTest {
         val (impl, _) = repository(
             credentialResult = Result.Error(CredentialException.KeyInvalidated()),

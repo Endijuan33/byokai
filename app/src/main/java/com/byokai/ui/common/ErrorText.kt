@@ -44,6 +44,9 @@ fun ProviderError.userMessage(): UiText = when (this) {
     is ProviderError.Parse ->
         UiText.Res(R.string.error_provider_parse, listOf(message))
 
+    is ProviderError.EmptyResponse ->
+        UiText.Res(R.string.error_provider_empty_response)
+
     is ProviderError.Config ->
         UiText.Res(R.string.error_provider_config, listOf(message))
 }

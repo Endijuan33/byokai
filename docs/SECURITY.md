@@ -166,6 +166,12 @@ claim made here.
   in the output. Export/import content is never written to logs;
   import failures surface only the validation reason. The 50 MB
   import cap is enforced on raw bytes before parsing.
+- **Export files are PLAINTEXT JSON (5D).** Conversation text and
+  prompt templates are written unencrypted. Anyone holding the file
+  can read them. Securing the exported file — where it is stored,
+  how it is shared, when it is deleted — is the user's
+  responsibility; the app cannot protect a file once it leaves the
+  device.
 
 ## Honest caveat (restated)
 
