@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Minimal host theme. The Compose UI (ByokaiTheme) draws all visuals;
+        this theme only provides a neutral window behind the splash and
+        supports edge-to-edge rendering.
+    -->
+    <style name="Theme.Byokai" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

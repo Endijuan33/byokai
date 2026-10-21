@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BYOKAI</string>
+    <!-- Shown on the Phase 1 placeholder home screen. Must stay honest: no
+         chat or provider features exist yet. -->
+    <string name="phase1_status">Phase 1 — CI foundation. Chat and provider features are not implemented yet.</string>
+</resources>

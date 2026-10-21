@@ -1,0 +1,128 @@
+# Release — manual workflow that builds a SIGNED release APK and AAB and
+# publishes them to GitHub Releases.
+#
+# Signing material comes ONLY from repository secrets (see docs/RELEASE.md):
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+#   ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+# The workflow FAILS with a clear message when any secret is missing. It never
+# generates a keystore automatically and never signs a release with the debug key.
+#
+# Action versions below are pinned to full semver tags verified on 2026-10-21
+# via the GitHub Releases API.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      versionName:
+        description: "Release version name (semantic, e.g. 0.1.0)"
+        required: true
+        default: "0.1.0"
+      prerelease:
+        description: "Mark the GitHub Release as a pre-release"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Signed release build
+    runs-on: ubuntu-latest
+    env:
+      VERSION_NAME: ${{ inputs.versionName }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7.0.1
+
+      - name: Validate version name
+        run: |
+          if ! [[ "$VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::versionName must be MAJOR.MINOR.PATCH (got '$VERSION_NAME')"
+            exit 1
+          fi
+
+      - name: Verify signing secrets are configured
+        id: secrets-check
+        run: |
+          missing=0
+          for var in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Missing required secret: $var"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Release signing secrets are not configured. Follow docs/RELEASE.md to generate a keystore once and store the four secrets, then re-run this workflow."
+            exit 1
+          fi
+          echo "all-present=true" >> "$GITHUB_OUTPUT"
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4.0.4
+        with:
+          api-level: 37
+          build-tools: 37.0.0
+
+      - name: Set up Gradle 9.8.0
+        uses: gradle/actions/setup-gradle@v6.4.0
+        with:
+          gradle-version: "9.8.0"
+
+      - name: Decode release keystore
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+      - name: Run unit tests and lint before release
+        run: gradle testDebugUnitTest lintDebug --stacktrace
+
+      - name: Assemble signed release APK and AAB
+        run: gradle assembleRelease bundleRelease -Pbyokai.versionName="$VERSION_NAME" --stacktrace
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Remove decoded keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"
+
+      - name: Verify APK signature
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
+          echo "Using apksigner: $APKSIGNER"
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk
+
+      - name: Generate SHA-256 checksums
+        run: |
+          cd app/build/outputs
+          sha256sum apk/release/app-release.apk bundle/release/app-release.aab | tee "$GITHUB_WORKSPACE/checksums-sha256.txt"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3.0.3
+        with:
+          tag_name: v${{ inputs.versionName }}
+          name: BYOKAI v${{ inputs.versionName }}
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
+          files: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/bundle/release/app-release.aab
+            checksums-sha256.txt

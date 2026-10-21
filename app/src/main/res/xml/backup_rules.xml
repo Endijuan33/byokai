@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!--
+        Phase 1: the app stores no credentials or sensitive data, so nothing is
+        excluded yet. When encrypted credential storage lands in Phase 3, the
+        files holding encrypted keys MUST be excluded here (and from
+        auto-backup) so key material never leaves the device via backup.
+    -->
+</full-backup-content>

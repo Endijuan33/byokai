@@ -1,0 +1,63 @@
+# PR Validation — builds, unit-tests, lints, and dependency-reviews every pull request.
+#
+# Action versions below are pinned to full semver tags verified on 2026-10-21
+# via the GitHub Releases API.
+
+name: PR Validation
+
+on:
+  pull_request:
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Build, test, lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4.0.4
+        with:
+          api-level: 37
+          build-tools: 37.0.0
+
+      - name: Set up Gradle 9.8.0
+        uses: gradle/actions/setup-gradle@v6.4.0
+        with:
+          gradle-version: "9.8.0"
+
+      - name: Assemble debug APK
+        run: gradle assembleDebug --stacktrace
+
+      - name: Run unit tests
+        run: gradle testDebugUnitTest --stacktrace
+
+      - name: Run Android lint
+        run: gradle lintDebug --stacktrace
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@v5.0.0
+
+      - name: Upload reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: pr-validation-reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          retention-days: 14
