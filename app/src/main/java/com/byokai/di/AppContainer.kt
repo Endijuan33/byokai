@@ -14,10 +14,12 @@ import com.byokai.data.repository.SettingsRepositoryImpl
 import com.byokai.data.repository.SqliteConversationRepository
 import com.byokai.data.security.AndroidKeysetAeadProvider
 import com.byokai.data.security.CredentialStorageHolder
+import com.byokai.data.repository.SqlitePromptRepository
 import com.byokai.data.security.TinkCredentialStore
 import com.byokai.domain.chat.ChatRepository
 import com.byokai.domain.provider.ProviderRegistry
 import com.byokai.domain.repository.ConversationRepository
+import com.byokai.domain.repository.PromptRepository
 import com.byokai.domain.repository.ProviderConfigRepository
 import com.byokai.domain.repository.SettingsRepository
 import com.byokai.domain.security.CredentialStore
@@ -106,5 +108,15 @@ class AppContainer(context: Context) {
      */
     val conversationRepository: ConversationRepository by lazy {
         SqliteConversationRepository(ByokaiDatabase.get(appContext))
+    }
+
+    /**
+     * Reusable system-prompt templates (Milestone 4C).
+     *
+     * Backed by the `prompts` table (schema v2). Like
+     * [conversationRepository], holds user text only — never API keys.
+     */
+    val promptRepository: PromptRepository by lazy {
+        SqlitePromptRepository(ByokaiDatabase.get(appContext))
     }
 }

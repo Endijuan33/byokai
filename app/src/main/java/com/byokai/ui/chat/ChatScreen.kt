@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -447,15 +448,24 @@ private fun MessageBubble(
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 if (message.text.isNotEmpty()) {
-                    Text(
-                        text = message.text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (isUser) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
+                    if (isUser) {
+                        Text(
+                            text = message.text,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    } else {
+                        // Read the ambient (platform) handler OUTSIDE the
+                        // provider override below: AssistantMarkdownText
+                        // replaces LocalUriHandler internally with the
+                        // safe variant, which calls back here only after
+                        // the URL passed LinkSafety.
+                        val platformUriHandler = LocalUriHandler.current
+                        AssistantMarkdownText(
+                            text = message.text,
+                            onLinkClick = { url -> platformUriHandler.openUri(url) },
+                        )
+                    }
                 }
                 if (showGenerating && message.text.isEmpty()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
