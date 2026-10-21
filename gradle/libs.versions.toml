@@ -28,6 +28,9 @@ tinkAndroid = "1.24.0"
 # keyset, verified on repo1.maven.org 2026-10-21 (stable). The on-device
 # keystore-backed path (tink-android) is covered by instrumented tests only.
 tink = "1.24.0"
+# OkHttp MockWebServer for adapter tests (scripted SSE, no real network).
+# Same version as okhttp itself, verified on repo1.maven.org 2026-10-21.
+mockwebserver3 = "5.5.0"
 datastorePreferences = "1.2.1"
 # kotlinx.coroutines 1.11.0 verified on repo1.maven.org 2026-10-21 (stable).
 # Pinned explicitly so the version is deterministic instead of floating on
@@ -58,6 +61,8 @@ okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhtt
 tink-android = { group = "com.google.crypto.tink", name = "tink-android", version.ref = "tinkAndroid" }
 # JVM Tink (unit tests only). Verified on repo1.maven.org 2026-10-21 (stable).
 tink = { group = "com.google.crypto.tink", name = "tink", version.ref = "tink" }
+# MockWebServer 3 for HTTP-level adapter tests. Verified on repo1.maven.org 2026-10-21 (stable).
+mockwebserver3 = { group = "com.squareup.okhttp3", name = "mockwebserver3", version.ref = "mockwebserver3" }
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
 # BOM-managed: no version.ref, the Compose BOM supplies a tested version.
 # Verified against the real artifacts (2026-10-21): ChatBubbleOutline lives

@@ -5,6 +5,8 @@ plugins {
     // error. The Kotlin toolchain version (2.4.21) is pinned by the
     // Compose compiler plugin below. See docs/BUILD.md.
     alias(libs.plugins.kotlin.compose)
+    // kotlinx.serialization for provider API DTOs (Milestone 3C).
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -108,9 +110,14 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     // Milestone 3B: Android Keystore + Tink encryption for API keys at rest.
     implementation(libs.tink.android)
+    // Milestone 3C: HTTP transport (OkHttp 5.x) + JSON (kotlinx.serialization).
+    implementation(libs.okhttp)
+    implementation(libs.serialization.json)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // Scripted HTTP servers for provider adapter tests (no real network).
+    testImplementation(libs.mockwebserver3)
     // JVM Tink for pure-JVM credential-store tests (no Android APIs).
     testImplementation(libs.tink)
 
