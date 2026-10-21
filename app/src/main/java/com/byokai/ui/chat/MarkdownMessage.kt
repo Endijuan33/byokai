@@ -1,13 +1,28 @@
 package com.byokai.ui.chat
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.dp
 import com.byokai.core.ui.LinkSafety
+import com.mikepenz.markdown.compose.LocalMarkdownColors
+import com.mikepenz.markdown.compose.LocalMarkdownDimens
+import com.mikepenz.markdown.compose.LocalMarkdownPadding
+import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.MarkdownCodeBackground
+import com.mikepenz.markdown.compose.elements.MarkdownCodeBlock
+import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 
@@ -28,11 +43,16 @@ import com.mikepenz.markdown.m3.markdownColor
  *   flow through [SafeUriHandler], which drops anything failing
  *   [LinkSafety.isSafeUrl] (non-http(s) schemes, relative URLs).
  *   Nothing opens automatically.
- * - **Code blocks** get the renderer's built-in copy button and
- *   language label; **tables** render via the renderer's table
- *   component. Syntax highlighting is intentionally not added — the
- *   renderer does not ship a highlighter, and bolting one on would be
- *   forced (per the milestone brief).
+ * - **Code blocks** render with a header row (language label + copy
+ *   button) via [CodeBlockWithCopy]. Note: the renderer's default code
+ *   block does NOT show this header — its internal `showHeader` flag
+ *   defaults to `false` and is never enabled by the default
+ *   components — so the header is wired explicitly here. Tapping the
+ *   copy button copies the block's code to the clipboard; **tables**
+ *   render via the renderer's table component. Syntax highlighting is
+ *   intentionally not added — the renderer does not ship a
+ *   highlighter, and bolting one on would be forced (per the milestone
+ *   brief).
  *
  * Streaming tradeoff: parsing is keyed on [text] inside the
  * renderer's remembered state and runs asynchronously — rapid
@@ -56,11 +76,77 @@ fun AssistantMarkdownText(
     // Match the previous plain-Text bubble styling (onSurface on
     // surfaceContainerHigh); the renderer's default is onBackground.
     val colors = markdownColor(text = MaterialTheme.colorScheme.onSurface)
+    // Custom code-block components: identical to the renderer's
+    // defaults except the header row (language label + copy button)
+    // is enabled. The default components leave it off.
+    val components = remember {
+        markdownComponents(
+            codeFence = {
+                MarkdownCodeFence(
+                    it.content,
+                    it.node,
+                    style = it.typography.code,
+                    block = { code, language, style ->
+                        CodeBlockWithCopy(code, language, style)
+                    },
+                )
+            },
+            codeBlock = {
+                MarkdownCodeBlock(
+                    it.content,
+                    it.node,
+                    style = it.typography.code,
+                    block = { code, language, style ->
+                        CodeBlockWithCopy(code, language, style)
+                    },
+                )
+            },
+        )
+    }
     CompositionLocalProvider(LocalUriHandler provides uriHandler) {
         Markdown(
             content = text,
             colors = colors,
             modifier = modifier,
+            components = components,
+        )
+    }
+}
+
+/**
+ * Code block with the header row enabled: language label on the left,
+ * copy-to-clipboard button on the right (the renderer's own
+ * `MarkdownCodeTopBar`, reached through the public
+ * [MarkdownCodeBackground] with `showHeader = true`).
+ *
+ * Mirrors the renderer's default code block styling; only the header
+ * differs.
+ */
+@Composable
+private fun CodeBlockWithCopy(
+    code: String,
+    language: String?,
+    style: TextStyle,
+) {
+    val colors = LocalMarkdownColors.current
+    val dimens = LocalMarkdownDimens.current
+    val padding = LocalMarkdownPadding.current
+    MarkdownCodeBackground(
+        color = colors.codeBackground,
+        shape = RoundedCornerShape(dimens.codeBackgroundCornerSize),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        showHeader = true,
+        language = language,
+        code = code,
+    ) {
+        Text(
+            text = code,
+            style = style.copy(color = MaterialTheme.colorScheme.onSurface),
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(padding.codeBlock),
         )
     }
 }
