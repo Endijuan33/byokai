@@ -240,7 +240,7 @@ class OpenAiAdapterTest {
         assertEquals("/v1/chat/completions", recorded.target)
         assertEquals("Bearer test-key-123", recorded.headers["Authorization"])
         val body = ProviderJson.parseToJsonElement(recorded.body?.utf8().orEmpty()).jsonObject
-        assertEquals(true, body["stream"]?.jsonPrimitive?.boolean, "request body was: $body")
+        assertEquals(true, body["stream"]?.jsonPrimitive()?.boolean, "request body was: $body")
         assertEquals("gpt-4o", body["model"]!!.jsonPrimitive.content)
         val messages = body["messages"]!!.jsonArray
         assertEquals(2, messages.size)
