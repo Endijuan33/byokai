@@ -5,16 +5,19 @@ import com.byokai.core.network.HttpClientFactory
 import com.byokai.data.chat.ChatRepositoryImpl
 import com.byokai.data.local.datastore.ProviderConfigHolder
 import com.byokai.data.local.datastore.SettingsDataStoreHolder
+import com.byokai.data.local.db.ByokaiDatabase
 import com.byokai.data.provider.anthropic.AnthropicAdapter
 import com.byokai.data.provider.gemini.GeminiAdapter
 import com.byokai.data.provider.openai.OpenAiAdapter
 import com.byokai.data.repository.DataStoreProviderConfigRepository
 import com.byokai.data.repository.SettingsRepositoryImpl
+import com.byokai.data.repository.SqliteConversationRepository
 import com.byokai.data.security.AndroidKeysetAeadProvider
 import com.byokai.data.security.CredentialStorageHolder
 import com.byokai.data.security.TinkCredentialStore
 import com.byokai.domain.chat.ChatRepository
 import com.byokai.domain.provider.ProviderRegistry
+import com.byokai.domain.repository.ConversationRepository
 import com.byokai.domain.repository.ProviderConfigRepository
 import com.byokai.domain.repository.SettingsRepository
 import com.byokai.domain.security.CredentialStore
@@ -91,5 +94,17 @@ class AppContainer(context: Context) {
      */
     val chatRepository: ChatRepository by lazy {
         ChatRepositoryImpl(providerRegistry, providerConfigRepository, credentialStore)
+    }
+
+    /**
+     * Persisted conversation history (Milestone 3E).
+     *
+     * Hand-rolled SQLite via [ByokaiDatabase] (no Room — no KSP for
+     * Kotlin 2.4.x). Holds conversation text and metadata only; API
+     * keys are never stored here — they live exclusively in
+     * [credentialStore].
+     */
+    val conversationRepository: ConversationRepository by lazy {
+        SqliteConversationRepository(ByokaiDatabase.get(appContext))
     }
 }

@@ -1,12 +1,17 @@
 package com.byokai.domain.model
 
 /**
- * One chat conversation (a thread of messages).
+ * One persisted conversation: a thread of [Message] rows forming the
+ * chat history (Milestone 3E).
  *
- * @property id stable identifier.
+ * The title starts as a default ("New conversation") and is replaced by
+ * the first user message's leading text once the user sends something.
+ * The list is ordered by [updatedAt] descending.
+ *
+ * @property id stable UUID, primary key in storage.
  * @property title user-visible title.
- * @property createdAt epoch millis when the conversation started.
- * @property updatedAt epoch millis of the last message or rename.
+ * @property createdAt epoch millis when the conversation was created.
+ * @property updatedAt epoch millis of the last message append or rename.
  */
 data class Conversation(
     val id: String,

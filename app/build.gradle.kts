@@ -113,6 +113,8 @@ dependencies {
     // Milestone 3C: HTTP transport (OkHttp 5.x) + JSON (kotlinx.serialization).
     implementation(libs.okhttp)
     implementation(libs.serialization.json)
+    // Milestone 3E: hand-rolled SQLite driver for conversation history (no Room — no KSP for Kotlin 2.4.x).
+    implementation(libs.sqlite.framework)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

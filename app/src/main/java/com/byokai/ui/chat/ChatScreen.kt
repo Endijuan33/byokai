@@ -74,10 +74,14 @@ import com.byokai.domain.model.ProviderConfig
  *   message, dropping the failed partial) and dismiss actions.
  * - Honest empty states: no provider configured, or no key saved yet —
  *   both link to the providers screen. No fake conversations.
+ * - Conversation history (Milestone 3E): [conversationId] opens an
+ *   existing conversation; null starts a new one. Turns are persisted
+ *   per conversation and the top bar shows its title.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
+    conversationId: String?,
     onBackClick: () -> Unit,
     onProvidersClick: () -> Unit,
 ) {
@@ -89,18 +93,37 @@ fun ChatScreen(
             container.chatRepository,
             container.providerConfigRepository,
             container.credentialStore,
+            container.conversationRepository,
         ),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val selectedConfig = uiState.configs.firstOrNull { it.id == uiState.selectedConfigId }
     val anyKeyReady = uiState.configs.any { uiState.keyReady[it.id] == true }
+    val defaultTitle = stringResource(R.string.conversations_new)
+
+    LaunchedEffect(conversationId) {
+        if (conversationId != null) {
+            viewModel.loadConversation(conversationId, defaultTitle)
+        } else {
+            viewModel.newConversation(defaultTitle)
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.chat_title)) },
+                title = {
+                    Text(uiState.conversationTitle ?: stringResource(R.string.chat_title))
+                },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(
+                        onClick = {
+                            // Drops the conversation row when the user never
+                            // sent anything; kept conversations are untouched.
+                            viewModel.discardIfEmpty()
+                            onBackClick()
+                        },
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.action_back),

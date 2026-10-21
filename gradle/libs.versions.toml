@@ -37,6 +37,11 @@ datastorePreferences = "1.2.1"
 # whatever lifecycle/datastore/navigation pull transitively. The -test
 # artifact is needed for ViewModel unit tests (TestDispatcher + runTest).
 coroutines = "1.11.0"
+# Hand-rolled SQLite for conversation history (Milestone 3E). No Room: KSP
+# has no 2.4.x release for Kotlin 2.4.21, so annotation processing cannot
+# run. Latest stable on dl.google.com, verified 2026-10-22 (2.8.0-alpha0x
+# excluded by the no-alpha rule).
+sqliteFramework = "2.7.1"
 junit = "4.13.2"
 # Instrumented-test runners. Versions verified against
 # https://dl.google.com/dl/android/maven2/.../maven-metadata.xml
@@ -72,6 +77,9 @@ compose-material-icons-extended = { group = "androidx.compose.material", name = 
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+# Hand-rolled SQLite driver (Milestone 3E). No version on the BOM path —
+# this artifact is not BOM-managed.
+sqlite-framework = { group = "androidx.sqlite", name = "sqlite-framework", version.ref = "sqliteFramework" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 # Instrumented-test dependencies. Versions verified against
 # https://dl.google.com/dl/android/maven2/.../maven-metadata.xml

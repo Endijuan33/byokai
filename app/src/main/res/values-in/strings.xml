@@ -98,4 +98,19 @@
     <string name="chat_dismiss_error">Tutup</string>
     <string name="chat_generating">Membuat respons…</string>
     <string name="chat_partial">Respons sebagian — stream terputus.</string>
+
+    <!-- Conversations (history) -->
+    <string name="conversations_title">Percakapan</string>
+    <string name="conversations_empty_title">Belum ada percakapan</string>
+    <string name="conversations_empty_body">Mulai chat baru dan akan muncul di sini.</string>
+    <string name="conversations_new_chat">Chat baru</string>
+    <string name="conversations_new">Percakapan baru</string>
+    <string name="conversations_delete">Hapus</string>
+    <string name="conversations_delete_title">Hapus percakapan?</string>
+    <string name="conversations_delete_body">Hapus "%1$s" beserta semua pesannya? Tindakan ini tidak dapat dibatalkan.</string>
+    <string name="conversations_cancel">Batal</string>
+    <string name="conversations_create_error">Gagal memulai percakapan baru. Coba lagi.</string>
+    <string name="conversations_save_error">Gagal menyimpan ke riwayat percakapan. Coba lagi.</string>
+    <string name="conversations_delete_error">Gagal menghapus percakapan. Coba lagi.</string>
+    <string name="conversations_not_found">Percakapan tidak ditemukan.</string>
 </resources>

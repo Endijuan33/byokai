@@ -98,4 +98,19 @@
     <string name="chat_dismiss_error">Dismiss</string>
     <string name="chat_generating">Generating response…</string>
     <string name="chat_partial">Partial response — the stream was interrupted.</string>
+
+    <!-- Conversations (history) -->
+    <string name="conversations_title">Conversations</string>
+    <string name="conversations_empty_title">No conversations yet</string>
+    <string name="conversations_empty_body">Start a new chat and it will appear here.</string>
+    <string name="conversations_new_chat">New chat</string>
+    <string name="conversations_new">New conversation</string>
+    <string name="conversations_delete">Delete</string>
+    <string name="conversations_delete_title">Delete conversation?</string>
+    <string name="conversations_delete_body">Delete "%1$s" and all its messages? This cannot be undone.</string>
+    <string name="conversations_cancel">Cancel</string>
+    <string name="conversations_create_error">Could not start a new conversation. Please try again.</string>
+    <string name="conversations_save_error">Could not save to conversation history. Please try again.</string>
+    <string name="conversations_delete_error">Could not delete the conversation. Please try again.</string>
+    <string name="conversations_not_found">Conversation not found.</string>
 </resources>

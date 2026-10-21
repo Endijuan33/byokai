@@ -1,10 +1,13 @@
 package com.byokai.ui
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.byokai.ui.chat.ChatScreen
+import com.byokai.ui.conversations.ConversationsScreen
 import com.byokai.ui.home.HomeScreen
 import com.byokai.ui.providers.ProvidersScreen
 import com.byokai.ui.settings.SettingsScreen
@@ -15,6 +18,15 @@ object Routes {
     const val SETTINGS = "settings"
     const val PROVIDERS = "providers"
     const val CHAT = "chat"
+    const val CONVERSATIONS = "conversations"
+
+    /**
+     * Chat route: bare `"chat"` starts a new conversation,
+     * `"chat?conversationId=<id>"` opens an existing one. Ids are UUIDs,
+     * so no argument encoding is needed.
+     */
+    fun chat(conversationId: String? = null): String =
+        if (conversationId == null) CHAT else "$CHAT?conversationId=$conversationId"
 }
 
 /**
@@ -22,7 +34,8 @@ object Routes {
  *
  * Phase 2 destinations: "home" (conversation list) and "settings".
  * Phase 3 adds "providers" (BYOK provider setup) and "chat" (streaming
- * chat over the user's own keys).
+ * chat over the user's own keys). Milestone 3E adds "conversations"
+ * (persisted history); "chat" takes an optional `conversationId`.
  */
 @Composable
 fun ByokaiApp() {
@@ -32,7 +45,7 @@ fun ByokaiApp() {
             HomeScreen(
                 onSettingsClick = { navController.navigate(Routes.SETTINGS) },
                 onProvidersClick = { navController.navigate(Routes.PROVIDERS) },
-                onChatClick = { navController.navigate(Routes.CHAT) },
+                onChatClick = { navController.navigate(Routes.CONVERSATIONS) },
             )
         }
         composable(Routes.SETTINGS) {
@@ -41,8 +54,26 @@ fun ByokaiApp() {
         composable(Routes.PROVIDERS) {
             ProvidersScreen(onBackClick = { navController.popBackStack() })
         }
-        composable(Routes.CHAT) {
+        composable(Routes.CONVERSATIONS) {
+            ConversationsScreen(
+                onBackClick = { navController.popBackStack() },
+                onOpenConversation = { id ->
+                    navController.navigate(Routes.chat(id))
+                },
+            )
+        }
+        composable(
+            route = "chat?conversationId={conversationId}",
+            arguments = listOf(
+                navArgument("conversationId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
             ChatScreen(
+                conversationId = backStackEntry.arguments?.getString("conversationId"),
                 onBackClick = { navController.popBackStack() },
                 onProvidersClick = { navController.navigate(Routes.PROVIDERS) },
             )
