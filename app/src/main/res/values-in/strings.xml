@@ -5,7 +5,7 @@
     <!-- Home (conversation list) -->
     <string name="home_title">Percakapan</string>
     <string name="home_empty_title">Belum ada percakapan</string>
-    <string name="home_empty_body">Chat dengan API key milikmu hadir di Fase 3 — pengaturan provider, streaming, dan riwayat.</string>
+    <string name="home_empty_body">Siapkan penyedia untuk mulai chat dengan API key milikmu.</string>
 
     <!-- Common actions -->
     <string name="action_settings">Pengaturan</string>
@@ -26,4 +26,76 @@
     <string name="settings_version">Versi</string>
     <string name="settings_application_id">ID Aplikasi</string>
     <string name="settings_save_error">Gagal menyimpan pengaturan. Coba lagi.</string>
+
+    <!-- Provider errors (ui/common/ErrorText.kt) -->
+    <string name="error_unknown">Terjadi kesalahan. Coba lagi.</string>
+    <string name="error_provider_auth">Provider menolak API key. Periksa kunci dan coba lagi.</string>
+    <string name="error_provider_rate_limited">Provider membatasi laju permintaan. Tunggu lalu coba lagi.</string>
+    <string name="error_provider_rate_limited_retry">Provider membatasi laju permintaan. Coba lagi dalam %1$d detik.</string>
+    <string name="error_provider_timeout">Permintaan habis waktu. Coba lagi.</string>
+    <string name="error_provider_network">Kesalahan jaringan: %1$s</string>
+    <string name="error_provider_invalid_model">Model "%1$s" tidak tersedia dengan kunci ini.</string>
+    <string name="error_provider_server">Kesalahan provider (HTTP %1$d): %2$s</string>
+    <string name="error_provider_parse">Tidak dapat membaca respons provider: %1$s</string>
+    <string name="error_provider_config">Masalah konfigurasi: %1$s</string>
+
+    <!-- Home additions -->
+    <string name="chat_start">Mulai chat</string>
+
+    <!-- Providers -->
+    <string name="providers_title">Penyedia</string>
+    <string name="providers_empty_title">Belum ada penyedia</string>
+    <string name="providers_empty_body">Tambahkan penyedia untuk chat dengan API key milikmu.</string>
+    <string name="providers_add">Tambah penyedia</string>
+    <string name="providers_edit_title">Ubah penyedia</string>
+    <string name="providers_key_saved">kunci tersimpan</string>
+    <string name="providers_no_key">tanpa kunci</string>
+    <string name="providers_models_count">%1$d model</string>
+    <string name="providers_field_provider">Penyedia</string>
+    <string name="providers_field_display_name">Nama tampilan</string>
+    <string name="providers_field_base_url">URL dasar</string>
+    <string name="providers_field_api_key">Kunci API</string>
+    <string name="providers_api_key_hint_new">Tempel API key milikmu</string>
+    <string name="providers_api_key_hint_existing">Tersimpan — masukkan kunci baru untuk menggantinya</string>
+    <string name="providers_api_key_keep_note">Kosongkan untuk mempertahankan kunci tersimpan.</string>
+    <string name="providers_api_key_toggle">Tampilkan atau sembunyikan kunci API</string>
+    <string name="providers_field_models">Model</string>
+    <string name="providers_model_id_hint">ID model, cth. gpt-4o</string>
+    <string name="providers_add_model">Tambah model</string>
+    <string name="providers_remove_model">Hapus model</string>
+    <string name="providers_field_default_model">Model bawaan</string>
+    <string name="providers_save">Simpan</string>
+    <string name="providers_cancel">Batal</string>
+    <string name="providers_test_connection">Uji koneksi</string>
+    <string name="providers_test_running">Menguji…</string>
+    <string name="providers_test_ok">Koneksi OK</string>
+    <string name="providers_test_no_key">Belum ada API key tersimpan. Simpan kunci terlebih dahulu.</string>
+    <string name="providers_test_missing">Penyedia tidak ditemukan.</string>
+    <string name="providers_refresh_models">Muat ulang model</string>
+    <string name="providers_refresh_empty">Provider tidak mengembalikan model apa pun.</string>
+    <string name="providers_http_warning">Peringatan: HTTP tanpa enkripsi hanya cocok untuk server lokal.</string>
+    <string name="providers_delete">Hapus</string>
+    <string name="providers_delete_title">Hapus penyedia?</string>
+    <string name="providers_delete_body">Hapus "%1$s" beserta API key yang tersimpan? Tindakan ini tidak dapat dibatalkan.</string>
+    <string name="providers_validation_failed">Konfigurasi tidak valid: %1$s</string>
+    <string name="providers_save_error">Gagal menyimpan penyedia. Coba lagi.</string>
+    <string name="providers_key_save_error">Penyedia tersimpan, tetapi API key gagal disimpan.</string>
+    <string name="providers_delete_error">Gagal menghapus penyedia. Coba lagi.</string>
+
+    <!-- Chat -->
+    <string name="chat_title">Chat</string>
+    <string name="chat_no_providers_title">Belum ada penyedia</string>
+    <string name="chat_no_providers_body">Siapkan penyedia dan simpan API key untuk mulai chat.</string>
+    <string name="chat_no_key_title">Belum ada API key</string>
+    <string name="chat_no_key_body">Penyedia belum memiliki kunci tersimpan. Tambahkan kunci untuk mulai chat.</string>
+    <string name="chat_open_providers">Atur penyedia</string>
+    <string name="chat_select_provider">Penyedia</string>
+    <string name="chat_select_model">Model</string>
+    <string name="chat_message_hint">Ketik pesan</string>
+    <string name="chat_send">Kirim</string>
+    <string name="chat_stop">Berhenti</string>
+    <string name="chat_retry">Coba lagi</string>
+    <string name="chat_dismiss_error">Tutup</string>
+    <string name="chat_generating">Membuat respons…</string>
+    <string name="chat_partial">Respons sebagian — stream terputus.</string>
 </resources>

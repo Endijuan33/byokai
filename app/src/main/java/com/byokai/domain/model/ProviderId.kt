@@ -1,5 +1,7 @@
 package com.byokai.domain.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Identifies a provider family served by an [com.byokai.domain.provider.AiProvider]
  * adapter.
@@ -9,6 +11,7 @@ package com.byokai.domain.model
  * - [OPENAI_COMPATIBLE]: any custom endpoint that speaks the OpenAI chat
  *   API shape; served by the OpenAI adapter with a user-supplied base URL.
  */
+@Serializable
 enum class ProviderId {
     /** First-party OpenAI API. */
     OPENAI,

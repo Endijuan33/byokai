@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -28,13 +30,17 @@ import com.byokai.R
 /**
  * Conversation list.
  *
- * Phase 2 shows an honest empty state: conversation storage does not exist
- * yet (it lands with Room in Phase 3), so no fake items are rendered and
- * no dead action buttons are shown.
+ * Phase 3 adds the two real entry points below the honest empty state:
+ * starting a chat and managing providers. No fake conversations are
+ * rendered.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(onSettingsClick: () -> Unit) {
+fun HomeScreen(
+    onSettingsClick: () -> Unit,
+    onProvidersClick: () -> Unit = {},
+    onChatClick: () -> Unit = {},
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -79,6 +85,14 @@ fun HomeScreen(onSettingsClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+            Spacer(modifier = Modifier.height(24.dp))
+            Button(onClick = onChatClick) {
+                Text(stringResource(R.string.chat_start))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(onClick = onProvidersClick) {
+                Text(stringResource(R.string.providers_title))
+            }
         }
     }
 }

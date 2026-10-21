@@ -34,4 +34,10 @@ sealed interface ProviderError {
 
     /** The response could not be parsed (unexpected or malformed payload). */
     data class Parse(val message: String) : ProviderError
+
+    /**
+     * The request could not be routed: the provider configuration is
+     * missing, or no adapter is registered for its provider family.
+     */
+    data class Config(val message: String) : ProviderError
 }

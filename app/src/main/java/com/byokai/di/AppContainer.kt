@@ -1,13 +1,22 @@
 package com.byokai.di
 
 import android.content.Context
+import com.byokai.core.network.HttpClientFactory
+import com.byokai.data.chat.ChatRepositoryImpl
+import com.byokai.data.local.datastore.ProviderConfigHolder
 import com.byokai.data.local.datastore.SettingsDataStoreHolder
+import com.byokai.data.provider.openai.OpenAiAdapter
+import com.byokai.data.repository.DataStoreProviderConfigRepository
 import com.byokai.data.repository.SettingsRepositoryImpl
 import com.byokai.data.security.AndroidKeysetAeadProvider
 import com.byokai.data.security.CredentialStorageHolder
 import com.byokai.data.security.TinkCredentialStore
+import com.byokai.domain.chat.ChatRepository
+import com.byokai.domain.provider.ProviderRegistry
+import com.byokai.domain.repository.ProviderConfigRepository
 import com.byokai.domain.repository.SettingsRepository
 import com.byokai.domain.security.CredentialStore
+import okhttp3.OkHttpClient
 
 /**
  * Manual dependency graph (interim).
@@ -43,5 +52,37 @@ class AppContainer(context: Context) {
             AndroidKeysetAeadProvider(appContext),
             CredentialStorageHolder.get(appContext),
         )
+    }
+
+    /**
+     * Shared HTTP client for provider adapters (Milestone 3C).
+     */
+    val httpClient: OkHttpClient by lazy { HttpClientFactory.create() }
+
+    /**
+     * Adapters for the provider families the app can talk to.
+     *
+     * OpenAI first; more adapters register here in later milestones.
+     */
+    val providerRegistry: ProviderRegistry by lazy {
+        ProviderRegistry().apply { register(OpenAiAdapter(httpClient)) }
+    }
+
+    /**
+     * User-configured provider connections (Milestone 3C).
+     *
+     * Keys are stored separately in [credentialStore]; this repository
+     * never sees key material.
+     */
+    val providerConfigRepository: ProviderConfigRepository by lazy {
+        DataStoreProviderConfigRepository(ProviderConfigHolder.get(appContext))
+    }
+
+    /**
+     * Chat entry point for the UI: resolves config + key + adapter per
+     * request and streams adapter events.
+     */
+    val chatRepository: ChatRepository by lazy {
+        ChatRepositoryImpl(providerRegistry, providerConfigRepository, credentialStore)
     }
 }

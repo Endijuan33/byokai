@@ -3,6 +3,7 @@ package com.byokai.domain.model
 import com.byokai.core.common.Result
 import com.byokai.core.network.EndpointValidation
 import com.byokai.core.network.EndpointValidator
+import kotlinx.serialization.Serializable
 
 /**
  * User-configured connection to one provider.
@@ -21,6 +22,7 @@ import com.byokai.core.network.EndpointValidator
  * @property createdAt epoch millis when the config was created.
  * @property updatedAt epoch millis of the last config edit.
  */
+@Serializable
 data class ProviderConfig(
     val id: String,
     val providerId: ProviderId,

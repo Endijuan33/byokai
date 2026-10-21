@@ -5,7 +5,7 @@
     <!-- Home (conversation list) -->
     <string name="home_title">Conversations</string>
     <string name="home_empty_title">No conversations yet</string>
-    <string name="home_empty_body">Chat with your own API keys arrives in Phase 3 — provider setup, streaming, and history.</string>
+    <string name="home_empty_body">Set up a provider to start chatting with your own API keys.</string>
 
     <!-- Common actions -->
     <string name="action_settings">Settings</string>
@@ -26,4 +26,76 @@
     <string name="settings_version">Version</string>
     <string name="settings_application_id">Application ID</string>
     <string name="settings_save_error">Couldn\'t save setting. Please try again.</string>
+
+    <!-- Provider errors (ui/common/ErrorText.kt) -->
+    <string name="error_unknown">Something went wrong. Please try again.</string>
+    <string name="error_provider_auth">The provider rejected the API key. Check the key and try again.</string>
+    <string name="error_provider_rate_limited">The provider is rate limiting requests. Please wait and try again.</string>
+    <string name="error_provider_rate_limited_retry">The provider is rate limiting requests. Try again in %1$d seconds.</string>
+    <string name="error_provider_timeout">The request timed out. Please try again.</string>
+    <string name="error_provider_network">Network error: %1$s</string>
+    <string name="error_provider_invalid_model">Model "%1$s" is not available with this key.</string>
+    <string name="error_provider_server">Provider error (HTTP %1$d): %2$s</string>
+    <string name="error_provider_parse">Could not read the provider\'s response: %1$s</string>
+    <string name="error_provider_config">Configuration problem: %1$s</string>
+
+    <!-- Home additions -->
+    <string name="chat_start">Start chat</string>
+
+    <!-- Providers -->
+    <string name="providers_title">Providers</string>
+    <string name="providers_empty_title">No providers yet</string>
+    <string name="providers_empty_body">Add a provider to chat with your own API keys.</string>
+    <string name="providers_add">Add provider</string>
+    <string name="providers_edit_title">Edit provider</string>
+    <string name="providers_key_saved">key saved</string>
+    <string name="providers_no_key">no key</string>
+    <string name="providers_models_count">%1$d models</string>
+    <string name="providers_field_provider">Provider</string>
+    <string name="providers_field_display_name">Display name</string>
+    <string name="providers_field_base_url">Base URL</string>
+    <string name="providers_field_api_key">API key</string>
+    <string name="providers_api_key_hint_new">Paste your API key</string>
+    <string name="providers_api_key_hint_existing">Saved — enter a new key to replace it</string>
+    <string name="providers_api_key_keep_note">Leave blank to keep the saved key.</string>
+    <string name="providers_api_key_toggle">Show or hide API key</string>
+    <string name="providers_field_models">Models</string>
+    <string name="providers_model_id_hint">Model ID, e.g. gpt-4o</string>
+    <string name="providers_add_model">Add model</string>
+    <string name="providers_remove_model">Remove model</string>
+    <string name="providers_field_default_model">Default model</string>
+    <string name="providers_save">Save</string>
+    <string name="providers_cancel">Cancel</string>
+    <string name="providers_test_connection">Test connection</string>
+    <string name="providers_test_running">Testing…</string>
+    <string name="providers_test_ok">Connection OK</string>
+    <string name="providers_test_no_key">No API key saved. Save a key first.</string>
+    <string name="providers_test_missing">Provider not found.</string>
+    <string name="providers_refresh_models">Refresh models</string>
+    <string name="providers_refresh_empty">The provider returned no models.</string>
+    <string name="providers_http_warning">Warning: cleartext HTTP is only appropriate for a local server.</string>
+    <string name="providers_delete">Delete</string>
+    <string name="providers_delete_title">Delete provider?</string>
+    <string name="providers_delete_body">Delete "%1$s" and its saved API key? This cannot be undone.</string>
+    <string name="providers_validation_failed">Invalid configuration: %1$s</string>
+    <string name="providers_save_error">Could not save the provider. Please try again.</string>
+    <string name="providers_key_save_error">Provider saved, but the API key could not be stored.</string>
+    <string name="providers_delete_error">Could not delete the provider. Please try again.</string>
+
+    <!-- Chat -->
+    <string name="chat_title">Chat</string>
+    <string name="chat_no_providers_title">No provider configured</string>
+    <string name="chat_no_providers_body">Set up a provider and save an API key to start chatting.</string>
+    <string name="chat_no_key_title">No API key yet</string>
+    <string name="chat_no_key_body">Your providers have no saved keys. Add a key to start chatting.</string>
+    <string name="chat_open_providers">Set up providers</string>
+    <string name="chat_select_provider">Provider</string>
+    <string name="chat_select_model">Model</string>
+    <string name="chat_message_hint">Type a message</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_stop">Stop</string>
+    <string name="chat_retry">Retry</string>
+    <string name="chat_dismiss_error">Dismiss</string>
+    <string name="chat_generating">Generating response…</string>
+    <string name="chat_partial">Partial response — the stream was interrupted.</string>
 </resources>
