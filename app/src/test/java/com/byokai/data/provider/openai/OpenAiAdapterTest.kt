@@ -305,18 +305,12 @@ class OpenAiAdapterTest {
                 .build(),
         )
 
-        // Short read timeout so the stalled socket read surfaces promptly
-        // after cancel; the production client keeps HttpClientFactory's 60s.
-        val stallingAdapter = OpenAiAdapter(
-            HttpClientFactory.create().newBuilder()
-                .readTimeout(1, TimeUnit.SECONDS)
-                .build(),
-        )
-
+        // The stalled server never responds; cancelling must unblock the
+        // stream promptly via the adapter's awaitClose -> call.cancel().
         val emitted = mutableListOf<ChatEvent>()
         runBlocking {
             val job = launch {
-                stallingAdapter.streamChat(config(), "test-key-123", request())
+                adapter.streamChat(config(), "test-key-123", request())
                     .collect { emitted += it }
             }
             delay(300)

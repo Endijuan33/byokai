@@ -21,6 +21,7 @@ import java.net.SocketTimeoutException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -100,10 +101,10 @@ class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
             ),
         )
 
-        // Cancellation: when the collector is cancelled, the producer
-        // coroutine is cancelled too and the finally below cancels the
-        // in-flight call, which unblocks the socket read (bounded by the
-        // 60s read timeout at worst).
+        // Cancellation: when the collector is cancelled, awaitClose's
+        // block cancels the in-flight call, which unblocks the socket
+        // read. (kotlinx.coroutines 1.11.0: awaitClose lives in
+        // kotlinx.coroutines.channels, not ...flow.)
         var call: Call? = null
         try {
             var attempt = 0
@@ -207,6 +208,7 @@ class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
         } finally {
             call?.cancel()
         }
+        awaitClose { call?.cancel() }
     }.flowOn(Dispatchers.IO)
 
     /**
