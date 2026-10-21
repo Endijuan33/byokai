@@ -1,11 +1,17 @@
-# Providers (Phase 3)
+# Providers (Phase 3, current 0.6.0)
 
-This document describes the provider system **as implemented** in Phase 3
-(milestones 3A–3E). The contract is `domain.provider.AiProvider`
-(`providerId`, `displayName`, `defaultBaseUrl`, `capabilities`,
-`listModels`, `testConnection`, `streamChat`); each adapter owns its
-auth scheme, message format, streaming protocol, and error mapping —
+This document describes the provider system **as implemented** (Phase 3,
+milestones 3A–3E; extended by reliability fixes in Phase 5). The contract is
+`domain.provider.AiProvider` (`providerId`, `displayName`, `defaultBaseUrl`,
+`capabilities`, `listModels`, `testConnection`, `streamChat`); each adapter
+owns its auth scheme, message format, streaming protocol, and error mapping —
 never assume providers share any of these.
+
+> **Device-test status (2026-10-22).** The Gemini adapter has been tested
+> live on the owner's device with the owner's own key
+> (`gemini-3.6-flash`). OpenAI and Anthropic are validated against
+> MockWebServer fixtures only. No real keys or live endpoints are ever
+> used in CI or in this repository.
 
 Adapters in `AppContainer.providerRegistry` (all share one
 `OkHttpClient` from `core.network.HttpClientFactory`, `Dispatchers.IO`
@@ -87,6 +93,12 @@ embedded credentials (`user@host`) rejected; the cloud metadata address
 `GET /v1/models` for listing and connection testing; `data: [DONE]`
 must terminate the stream.
 
+**Switching provider family** (`ProvidersViewModel.selectProviderFamily`):
+a blank base-URL field, or one still holding the previous family's
+default, is replaced with the new family's default; a hand-typed URL is
+left alone, so a custom proxy or OpenAI-compatible endpoint is never
+clobbered by accident.
+
 ## Anthropic
 
 - **Auth**: `x-api-key: <apiKey>` header (plus the required
@@ -165,9 +177,11 @@ must terminate the stream.
 
 Non-HTTP errors: `Timeout` (socket timeout), `Network(cause)`
 (transport failure), `Parse` (malformed payload), `Config` (missing
-config / unregistered provider / invalid endpoint). Error messages come
-from the provider's envelope on a best-effort basis and **never contain
-the API key**.
+config / unregistered provider / invalid endpoint), and
+`EmptyResponse` (the provider returned a successful-but-empty
+completion — surfaced in the UI as a friendly message, never an empty
+bubble). Error messages come from the provider's envelope on a
+best-effort basis and **never contain the API key**.
 
 ## Capability flags
 
@@ -190,4 +204,6 @@ the API key**.
   [TESTING.md](TESTING.md)), not live provider endpoints — behavior
   against real servers is verified only with the user's own key on
   their own device. Real-key testing never happens in CI or in this
-  repository.
+  repository. Live device validation so far: **Gemini only**
+  (`gemini-3.6-flash`, 2026-10-22); OpenAI and Anthropic are
+  MockWebServer-only.

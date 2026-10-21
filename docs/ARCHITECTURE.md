@@ -1,8 +1,9 @@
 # Architecture
 
-## Status: Phase 4 — Advanced Chat Experience, Prompt Management & Data Portability (milestones 4A–4E complete, 4F in progress)
+## Status: Phase 6 — Security & Compatibility (in progress)
 
-This document describes the architecture **as implemented today** plus the
+This document describes the architecture **as implemented today** (0.6.0:
+Phases 1–5 shipped; Phase 5 = Reliability & Conversation Experience) plus the
 planned module boundaries for later phases. Anything marked "planned" does
 not exist yet — see [ROADMAP.md](ROADMAP.md) for the honest phase statuses.
 
@@ -198,6 +199,31 @@ Design decisions (added or changed in Phase 3):
   format documented in `docs/EXPORT.md`; SAF UI in Settings → Data.
 - All Phase 3 decisions stand.
 
+## Implemented (Phase 5 — reliability)
+
+No new packages; reliability fixes land in existing ones:
+
+- **Synchronous send claim** (`ui.chat.ChatViewModel`): a second
+  `send()` (e.g. a fast double tap) while a send is already claimed
+  is rejected before it can persist the user turn twice or start a
+  second stream; the claim is compare-and-set on `canSend` and is
+  released on every abort path.
+- **`ProviderError.EmptyResponse`**: `ChatRepositoryImpl` normalizes a
+  successful-but-empty completion to this typed error; the UI maps it
+  to a friendly EN/ID message and nothing empty is persisted.
+- **Stop→send turn ordering**: the partial-turn persist job started by
+  `stop()` is tracked and joined before the next user turn is
+  written, so database turn order is preserved.
+- **Mid-stream config/model switch**: `selectConfig`/`selectModel`
+  stop the stale stream first (partial text kept, persisted when a
+  conversation is active) instead of silently continuing under the
+  new selection.
+- **Code-block copy fix** (`ui.chat.MarkdownMessage`): the mikepenz
+  renderer's default code block never shows its header row
+  (`showHeader` defaults to false in 0.46.0); custom code-block
+  components (`CodeBlockWithCopy`) now enable the header explicitly
+  (language label + copy button).
+
 ## Planned module boundaries (Phase 2+)
 
 When the codebase outgrows one module, it splits along these lines
@@ -225,6 +251,7 @@ Rules that already apply:
 - **Room (local database):** deferred for the same KSP reason — latest
   Room 2.8.5 needs KSP. Conversation persistence is hand-rolled SQLite
   via `androidx.sqlite:sqlite-framework:2.7.1` (verified 2026-10-22),
-  with migration tests deferred until the first schema change.
-- **Minification:** R8 is off until Phase 5, when ProGuard rules are reviewed
-  rule-by-rule.
+  with migration logic tested on the JVM via `org.xerial:sqlite-jdbc`
+  (test-scoped) in Phase 4A.
+- **Minification:** R8 is off until Phase 6 (security & compatibility),
+  when ProGuard rules are reviewed rule-by-rule.

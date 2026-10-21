@@ -8,8 +8,12 @@
 2. **English everywhere** — all code, comments, commit messages, and docs.
 3. **Evidence over claims.** Diagnose failures from actual CI logs, not assumptions.
 4. **Minimal, reviewable patches.** Prefer small focused changes over rewrites.
-5. **Never commit secrets.** No keystores, passwords, API keys, or tokens —
-   in code, resources, or build outputs. Ever.
+5. **Never commit secrets.** No passwords, API keys, tokens, or *release*
+   keystores — in code, resources, or build outputs. Ever. The single
+   deliberate exception is the debug-only `debug.keystore` at the repo
+   root (documented in [docs/BUILD.md](docs/BUILD.md)): it exists only so
+   debug builds share one signature, and it must never be used for
+   release signing.
 
 ## Workflow
 
@@ -49,3 +53,8 @@ docs(roadmap): mark Phase 2 as in progress
 A feature is done when: it is implemented (not just designed), unit-tested
 where applicable, lint-clean, documented, and the relevant CI workflow is
 green. See [docs/ROADMAP.md](docs/ROADMAP.md) for phase-level acceptance.
+
+When documenting validation, distinguish **unit-tested (CI)** from
+**device-tested (owner's own phone, own keys)** — never let a green unit
+suite imply a device run, and never claim a provider was tested live unless
+it was (see [docs/TESTING.md](docs/TESTING.md)).

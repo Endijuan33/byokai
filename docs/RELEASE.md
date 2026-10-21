@@ -1,5 +1,10 @@
 # Release process
 
+> **Status (0.6.0):** no signed release has been published yet — the four
+> signing secrets below are expected but not configured, so the Release
+> workflow currently fails fast with a clear error instead of producing
+> unsigned artifacts. Setting them up is part of Phase 7.
+
 ## One-time signing setup
 
 The release keystore is created **once** by the project owner on a trusted

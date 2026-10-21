@@ -3,7 +3,44 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [0.6.0] — 2026-10-22
+
+Phase 6: Security & Compatibility.
+
+### Added
+
+- R8 enabled for release builds (`isMinifyEnabled=true`,
+  `isShrinkResources=true`) with rule-by-rule reviewed keep rules
+  (`app/proguard-rules.pro`): kotlinx-serialization scoped to
+  `com.byokai.**`, full keep for Tink (the published artifact ships
+  no consumer ProGuard rules).
+- `res/xml/network_security_config.xml`: cleartext forbidden platform-wide
+  (defense in depth over `EndpointValidator`); no certificate pinning
+  (BYOK custom endpoints must keep working).
+- `res/xml/data_extraction_rules.xml` (API 31+): cloud backup excludes
+  key material AND `byokai.db`; device-to-device transfer excludes key
+  material only (conversations migrate with the user).
+- `SecurityConfigTest`: 7 unit tests locking in the backup and network
+  policy decisions (254 tests total).
+- CI step validating the full R8 pipeline (`assembleRelease` signed
+  with the committed debug keystore; validation artifact only — the
+  real release gate is untouched).
+
+### Changed
+
+- Backup policy decided and documented: `byokai.db` is excluded from
+  Auto Backup (conversation text is unencrypted at rest by design and
+  users paste secrets into chats). Portability remains via explicit
+  JSON export, which never contains credentials.
+- Full documentation audit & sync: README, CHANGELOG, CONTRIBUTING,
+  SECURITY, and all docs/* brought in line with the 0.6.0 codebase
+  and phase history.
+
+### Security
+
+- Dependabot: 0 open alerts (verified).
+- Credential audit: no `Log.*` in main source; error paths carry no
+  key material; exports still contain no credentials (test-asserted).
 
 ## [0.5.0] — 2026-10-22
 
@@ -33,6 +70,10 @@ Phase 5: Reliability & Conversation Experience.
   (`showHeader` defaults to false, verified in 0.46.0 sources). 0.5.0
   wires custom code-block components that enable the header explicitly
   (language label + copy button).
+
+### Changed
+
+- `versionCode` 5, `versionName` 0.5.0.
 
 ### Security
 
@@ -237,7 +278,9 @@ Phase 1: repository and CI foundation.
   toolchain. See docs/ROADMAP.md.
 - R8/minification is deferred to Phase 5.
 
-[Unreleased]: https://github.com/Endijuan33/byokai/compare/v0.3.0...HEAD
+[0.6.0]: https://github.com/Endijuan33/byokai/releases/tag/v0.6.0
+[0.5.0]: https://github.com/Endijuan33/byokai/releases/tag/v0.5.0
+[0.4.0]: https://github.com/Endijuan33/byokai/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Endijuan33/byokai/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Endijuan33/byokai/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Endijuan33/byokai/releases/tag/v0.1.0

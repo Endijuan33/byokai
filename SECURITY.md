@@ -19,8 +19,12 @@ fix before any public mention. Please allow reasonable time for remediation.
 
 ## Security practices in this project
 
-- **No secrets in the repository.** Keystores, passwords, API keys, and tokens
-  are never committed. Release signing uses GitHub Actions secrets only.
+- **No secrets in the repository.** Passwords, API keys, tokens, and the
+  *release* keystore are never committed. Release signing uses GitHub
+  Actions secrets only. The sole exception is the debug-only
+  `debug.keystore` at the repo root, committed intentionally so debug
+  builds share one signature (see [docs/BUILD.md](docs/BUILD.md)); it is
+  never used for release signing.
 - **Encrypted credential storage.** Provider API keys are encrypted at rest
   using keys protected by the Android Keystore (from Phase 3 onward).
   Encrypted stores are excluded from device backups.

@@ -74,10 +74,23 @@ debug builds only and must never be used for release signing; the
 release key lives exclusively in GitHub Secrets (see
 `docs/RELEASE.md`).
 
+## Release hardening (R8)
+
+Release builds run R8 (`isMinifyEnabled=true`, `isShrinkResources=true`);
+debug stays unminified. Keep rules in `app/proguard-rules.pro` were
+reviewed per library (kotlinx-serialization scoped to `com.byokai.**`;
+`-keep class com.google.crypto.tink.**` because the published
+tink-android artifact ships no consumer rules of its own). CI
+validates the full R8 pipeline on every push via a dedicated
+`assembleRelease` step signed with the committed debug keystore
+(validation artifact only) — the real `release.yml` still fails
+loudly until the release signing secrets are configured.
+
 ## Artifacts
 
-- `ci.yml` uploads `byokai-debug-apk` (the debug APK, 30-day retention) and
-  `ci-reports` (test + lint reports, 30-day retention).
+- `ci.yml` uploads `byokai-debug-apk` (the debug APK, 30-day retention),
+  `byokai-release-r8-validation-apk` (R8-validated release APK, 14-day
+  retention), and `ci-reports` (test + lint reports, 30-day retention).
 - `pr-validation.yml` uploads `pr-validation-reports` only when the job fails
   (14-day retention).
 - `release.yml` attaches the signed APK, AAB, and `checksums-sha256.txt` to

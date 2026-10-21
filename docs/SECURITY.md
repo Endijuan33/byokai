@@ -1,8 +1,12 @@
-# Credential Security (Milestone 3B, extended in 3F)
+# Credential Security (Phase 3+, current 0.6.0)
 
 How BYOKAI protects provider API keys. All code/comments are in the
 `data.security` and `domain.security` packages; the DI wiring lives in
 `di/AppContainer.kt`.
+
+> Phase 6 (Security & Compatibility) is in progress and will extend this
+> document with the R8/minification, network security config, backup
+> policy, and dependency audit findings as they land.
 
 > **MANDATORY HONEST CAVEAT — read this first.**
 >
@@ -172,6 +176,47 @@ claim made here.
   how it is shared, when it is deleted — is the user's
   responsibility; the app cannot protect a file once it leaves the
   device.
+
+## Phase 6 additions (security & compatibility)
+
+- **R8 on release builds.** Release builds run R8 with
+  `isMinifyEnabled=true` and `isShrinkResources=true`; keep rules
+  live in `app/proguard-rules.pro` and were reviewed rule-by-rule.
+  kotlinx-serialization rules are scoped to `com.byokai.**` (all
+  `@Serializable` classes; no polymorphic serializers in use), and
+  `-keep class com.google.crypto.tink.**` is required because the
+  published `tink-android` artifact ships no consumer ProGuard rules
+  of its own — shrinking Tink's reflectively-loaded key types would
+  break keyset decryption and lock the user out of stored API keys.
+  AndroidX, Compose, OkHttp, and DataStore merge their own consumer
+  rules automatically. CI validates the full R8 pipeline on every
+  push by running `assembleRelease` signed with the committed *debug*
+  keystore (validation artifact only); the real release workflow
+  still fails loudly until release signing secrets are configured.
+- **Backup policy: `byokai.db` is excluded from Auto Backup.**
+  Conversation text is not encrypted at rest (by design) and users
+  paste secrets into chats, so the database must never be uploaded
+  to Google Drive via Auto Backup. On API 31+ this is enforced via
+  `res/xml/data_extraction_rules.xml` (`android:dataExtractionRules`);
+  on API 28–30 via `res/xml/backup_rules.xml`
+  (`android:fullBackupContent`). API keys and the Tink keyset were
+  already excluded — they are Keystore-bound and could never decrypt
+  after a restore. Device-to-device transfer still carries the
+  conversation database (user-initiated over a direct connection)
+  while key material is left behind; the user re-enters API keys on
+  the new device. Conversation portability remains available through
+  the explicit JSON export in Settings, which never contains
+  credentials.
+- **Network security config.** `res/xml/network_security_config.xml`
+  sets `cleartextTrafficPermitted="false"` as defense in depth over
+  `EndpointValidator` (HTTPS-only; HTTP solely for loopback with a
+  warning) and an OkHttp client that never follows redirects. Note:
+  with cleartext forbidden at the platform layer, the validator's
+  loopback-HTTP carve-out is unreachable on-device — the intended
+  outcome; a local dev server must be reached over TLS. No
+  certificate pinning, deliberately: BYOKAI is bring-your-own-key
+  with user-supplied endpoints, and pinning would break legitimate
+  custom endpoints.
 
 ## Honest caveat (restated)
 

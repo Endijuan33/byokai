@@ -37,13 +37,16 @@ Note: conversation persistence is hand-rolled SQLite via
 `androidx.sqlite:sqlite-framework:2.7.1` (Phase 3, Milestone 3E) — Room
 stays deferred on KSP, but persistence no longer waits on it.
 
-## Phase 3 — BYOK core — IN PROGRESS (milestones 3A–3E complete, 3F in progress)
+## Phase 3 — BYOK core — COMPLETED (2026-10-22, v0.3.0)
 
 Provider registry, `ProviderAdapter` interface + first adapters, encrypted
 credential storage (Keystore + Tink), model selector, streaming chat,
 conversation history, error/timeout/retry/cancellation handling.
-Acceptance: real streamed chat against at least two providers with the user's
-own key; adapter contract tests green; credential redaction tests green.
+Acceptance: streamed chat against real provider endpoints with the user's
+own key — **met 2026-10-22 on the owner's device** (Gemini live,
+`gemini-3.6-flash`; OpenAI and Anthropic remain validated against
+MockWebServer fixtures only — see "Validation honesty" below); adapter
+contract tests green; credential redaction tests green.
 
 Milestones (all CI green at their merge commits):
 
@@ -59,14 +62,9 @@ Milestones (all CI green at their merge commits):
   tests; registry wiring.
 - [x] **3E** — hand-rolled SQLite persistence (`byokai.db`, schema v1),
   `ConversationRepository`, conversation history UI.
-- [ ] **3F** — documentation + version bump (in progress): provider docs,
+- [x] **3F** — documentation + version bump: provider docs,
   security/network docs, architecture/roadmap/testing docs, CHANGELOG,
   `versionCode` 3 / `versionName` 0.3.0.
-
-Remaining acceptance gap: streamed chat has been validated against
-scripted MockWebServer fixtures, not yet against the real provider
-endpoints with the user's own key — that is a device-side validation,
-explicitly not done in CI (no real keys in this repository, ever).
 
 ## Phase 4 — Advanced Chat Experience, Prompt Management & Data Portability — SHIPPED (v0.4.0, 2026-10-22)
 
@@ -104,24 +102,60 @@ export files documented as plaintext JSON, user-responsible).
 Acceptance: build + full unit suite green, no known Phase 4
 regressions, manual device checklist in the Phase 5 report.
 
-## Phase 6 — Security and compatibility — NOT STARTED
+## Validation honesty (read before claiming a phase is done)
 
-Network/storage audit, permission review, API-level behavior matrix
-(28–37), R8/minification enablement with reviewed ProGuard rules,
-dependency security audit, privacy review.
-Acceptance: documented test matrix with real device/emulator results.
+Two different kinds of validation exist in this project and they are not
+interchangeable:
 
-## Phase 6 — Release engineering — NOT STARTED
+- **Unit-tested (CI)** — JVM unit tests, lint, dependency review. All
+  phases are validated this way (254 unit tests green at 0.6.0).
+- **Device-tested (owner's own phone, own keys)** — manual checklists the
+  owner runs on his own device. Completed: **Phase 4** (copy button,
+  Prompts UI, link taps, system prompt per conversation, export/import)
+  and **Phase 5** (double-tap send, stop→send, mid-stream provider/model
+  switch, airplane mode, retry after failure, force-stop) — all passed
+  2026-10-22. **Gemini was tested live on-device with the owner's key**
+  (`gemini-3.6-flash`); OpenAI and Anthropic remain validated against
+  MockWebServer fixtures only. No real keys ever enter this repository
+  or CI.
 
-Release signing operational (secrets configured), APK signature validation,
-AAB publishing, changelog/versioning discipline, GitHub Releases, install
+## Phase 6 — Security and compatibility — SHIPPED (0.6.0)
+
+Documentation audit and sync (README, CHANGELOG, all docs/* vs. code),
+Dependabot review (0 open alerts), R8/minification enabled for release
+with reviewed ProGuard rules (CI validates the R8 pipeline via
+`assembleRelease` signed with the debug keystore — validation artifact
+only), backup policy decided (`byokai.db` excluded from Auto Backup;
+D2D transfer keeps conversations, drops key material), network
+security config (cleartext forbidden, no pinning), dependency audit
+(all pins current except datastore-preferences 1.3.0, deliberately not
+upgraded), API 28–37 audit (no unguarded newer-API calls; lint NewApi
+green; device-only behaviors honestly listed).
+
+## Phase 7 — Release engineering — NOT STARTED
+
+Release signing operational (the four signing secrets configured — they
+are still expected, not yet set), APK signature validation, AAB
+publishing, changelog/versioning discipline, GitHub Releases, install
 and key-recovery documentation. Acceptance: a signed release installable
 and updatable on a real device.
 
-## Phase 7 — Continuous improvement — NOT STARTED
+## Phase 8 — Continuous improvement — NOT STARTED
 
 Issue triage, regression fixes, controlled dependency updates, periodic
 quality/security audits.
+
+### Uncommitted future candidates (not promised, not scheduled)
+
+- Compatible-endpoint adapters (DeepSeek, xAI, OpenRouter) once the
+  foundation is stable — the `OPENAI_COMPATIBLE` provider id exists for
+  this, but no adapter work has started.
+- Automatic context summarization (currently: heuristic estimate +
+  request-side truncation only).
+- Encrypted conversation history (optional; the DB is deliberately
+  unencrypted today).
+- Instrumented on-device Keystore test in the CI matrix (currently
+  device-only).
 
 ## Deferred technical items
 
@@ -133,8 +167,9 @@ quality/security audits.
   2.8.5 needs KSP). Phase 3 ships conversation persistence anyway, as
   hand-rolled SQLite (`androidx.sqlite:sqlite-framework:2.7.1`); Room
   stays the long-term option once KSP supports Kotlin 2.4.x.
-- **R8/minification:** intentionally off until the security &
-  compatibility phase (now Phase 6 after the Phase 5 scope change).
+- **R8/minification:** enabled for release builds in Phase 6 (0.6.0)
+  with reviewed ProGuard rules; CI validates the R8 pipeline on every
+  push.
 
 ## Version decisions (all verified 2026-10-21 unless marked otherwise)
 
@@ -158,5 +193,7 @@ quality/security audits.
 | kotlinx-coroutines (core/android/test) | 1.11.0 | repo1.maven.org maven-metadata |
 | mockwebserver3 | 5.5.0 | repo1.maven.org maven-metadata (verified 2026-10-22) |
 | androidx.sqlite sqlite-framework | 2.7.1 | dl.google.com maven-metadata (verified 2026-10-22) |
+| mikepenz multiplatform-markdown-renderer-m3-android | 0.46.0 | repo1.maven.org maven-metadata (verified 2026-10-22, Phase 4B) |
+| org.xerial sqlite-jdbc (test-scoped) | 3.53.4.0 | repo1.maven.org maven-metadata (verified 2026-10-22, Phase 4A) |
 | compose material-icons-core | BOM-managed | Compose BOM 2026.09.00 |
 | junit | 4.13.2 | repo1.maven.org maven-metadata |

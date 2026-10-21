@@ -80,6 +80,15 @@ configurations — the export path (`ConversationExportManager` →
 `ConversationRepository`) has no access to the credential store, and
 `ByokaiExportTest` asserts the output carries no key-like material.
 
+## Security note
+
+Export files are **plaintext JSON** (current 0.6.0). Anyone holding the
+file can read the conversation text and prompt templates it contains.
+Securing the exported file — where it is stored, how it is shared, when
+it is deleted — is the user's responsibility; the app cannot protect a
+file once it leaves the device. See [SECURITY.md](SECURITY.md) for the
+full security design and caveats.
+
 ## Audit notes
 
 - Export/import file content is never written to logs. Import

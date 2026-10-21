@@ -49,6 +49,9 @@ The provider system is tested entirely against fakes and scripted servers —
 - **Real API keys / real provider endpoints** — never, by rule. Behavior
   against live servers is validated only with the user's own key on
   their own device; it cannot happen in CI or in this repository.
+  Device validation so far: **Gemini** was tested live on the owner's
+  phone (`gemini-3.6-flash`, 2026-10-22); **OpenAI and Anthropic remain
+  MockWebServer-only**.
 - **Real SQLite on the JVM** — `SqliteConversationRepository`,
   `SqlitePromptRepository`, and `ByokaiDatabase` are Android-only (they
   need a `Context` and the `sqlite-framework` driver); they are not
@@ -62,23 +65,26 @@ The provider system is tested entirely against fakes and scripted servers —
   the only untested seam.
 - **On-device Keystore** — `src/androidTest` ships
   `TinkCredentialStoreKeystoreTest` for the keystore-backed path, but it
-  requires a real device/emulator and **does not run in CI** (Phase 5
-  device matrix). The JVM Tink tests above cover the encryption logic;
-  the Keystore binding is documented but untested until a device run.
-- Instrumented UI/screenshot tests — planned (Phase 4).
+  requires a real device/emulator and **does not run in CI**. The JVM Tink
+  tests above cover the encryption logic; the Keystore binding is
+  documented but untested until a device run. Owner manual device
+  checklists (Phases 4 and 5) exercised the app on-device but did not
+  cover this test.
+- Instrumented UI/screenshot tests — planned (Phase 4, still not done).
 
 ## Layers
 
 | Layer | Tool | Status |
 |---|---|---|
-| JVM unit tests | JUnit 4 (`gradle testDebugUnitTest`) | Active (Phases 1–3) |
+| JVM unit tests | JUnit 4 (`gradle testDebugUnitTest`) | Active (Phases 1–6) — **254 tests** at 0.6.0 |
 | Android lint | `gradle lintDebug`, `abortOnError = true` | Active (Phase 1) |
 | Dependency review | `dependency-review-action` on PRs | Active (Phase 1) |
 | Dependabot | Weekly Gradle + Actions updates | Active (Phase 1) |
-| Instrumented tests | `connectedDebugAndroidTest` | Deferred — Phase 5 device matrix |
-| Screenshot tests | Planned | Planned (Phase 4) |
+| Instrumented tests | `connectedDebugAndroidTest` | Written (keystore path), **not run in CI** — no device matrix |
+| Device testing | Owner's own phone + own keys | Phases 4 & 5 manual checklists **passed** (see below) |
+| Screenshot tests | Planned | Planned (Phase 4, not started) |
 
-## Current coverage (Phase 4)
+## Current coverage (Phase 5)
 
 - `VersionInfoTest` (Phase 1) — still green.
 - Phase 2: enum storage-key round-trips, `SettingsViewModel` + fake,
@@ -104,10 +110,30 @@ The provider system is tested entirely against fakes and scripted servers —
     truncation (order, system-prompt budgeting, fallbacks).
   - `ByokaiExportTest` — envelope, round-trip fidelity with fresh
     ids, no-credential-material assertion, all rejection paths.
+- Phase 5 (all green in CI) — in `ChatViewModelTest`/`ChatRepositoryImplTest`:
+  synchronous send-claim rejects a double `send()` (no duplicate user
+  turn, single stream), empty completions normalize to
+  `ProviderError.EmptyResponse` (nothing empty persisted),
+  stop→send ordering, mid-stream config/model switch stops the stale
+  stream first; `ContextPolicyTest` audits the 4D truncation policy.
 - Honest gap: no Compose UI/golden tests (need instrumented tests;
-  deferred to the Phase 5 device matrix). Markdown rendering
-  correctness relies on the pinned upstream library (0.46.0) plus
-  on-device validation.
+  device-only). Markdown rendering correctness relies on the pinned
+  upstream library (0.46.0) plus on-device validation.
+
+## Device testing (owner's own phone, own keys — 2026-10-22)
+
+Unit tests are necessary but not sufficient; the owner runs manual
+device checklists. Both passed:
+
+- **Phase 4**: markdown copy button in code blocks, Prompts management
+  UI, link-tap gating, per-conversation system prompt (all three
+  adapters), export/import round-trip.
+- **Phase 5**: double-tap send (no duplicate user turn, single stream),
+  stop→send turn order, mid-stream provider/model switch, airplane mode
+  error + retry, retry after failure, force-stop recovery.
+- **Live provider test**: Gemini only (`gemini-3.6-flash`) — streaming
+  chat and connection test with the owner's own key. OpenAI/Anthropic
+  remain MockWebServer-only.
 
 ## Required coverage as features land
 
