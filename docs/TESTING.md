@@ -76,7 +76,7 @@ The provider system is tested entirely against fakes and scripted servers —
 
 | Layer | Tool | Status |
 |---|---|---|
-| JVM unit tests | JUnit 4 (`gradle testDebugUnitTest`) | Active (Phases 1–6) — **254 tests** at 0.6.0 |
+| JVM unit tests | JUnit 4 (`gradle testDebugUnitTest`) | Active (Phases 1–6) — **253 tests** at 0.6.0 |
 | Android lint | `gradle lintDebug`, `abortOnError = true` | Active (Phase 1) |
 | Dependency review | `dependency-review-action` on PRs | Active (Phase 1) |
 | Dependabot | Weekly Gradle + Actions updates | Active (Phase 1) |

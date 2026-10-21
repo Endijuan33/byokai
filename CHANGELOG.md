@@ -20,8 +20,8 @@ Phase 6: Security & Compatibility.
 - `res/xml/data_extraction_rules.xml` (API 31+): cloud backup excludes
   key material AND `byokai.db`; device-to-device transfer excludes key
   material only (conversations migrate with the user).
-- `SecurityConfigTest`: 7 unit tests locking in the backup and network
-  policy decisions (254 tests total).
+- `SecurityConfigTest`: 6 unit tests locking in the backup and network
+  policy decisions (253 tests total).
 - CI step validating the full R8 pipeline (`assembleRelease` signed
   with the committed debug keystore; validation artifact only — the
   real release gate is untouched).

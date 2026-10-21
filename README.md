@@ -8,7 +8,7 @@ Anthropic, and Google Gemini, plus OpenAI-compatible endpoints — all with
 streaming chat, conversation history, prompt templates, and import/export.
 
 > **Project status: Phase 6 — Security & Compatibility (shipped, 0.6.0).**
-> The app builds, runs on-device, and is validated by CI (254 unit tests, lint
+> The app builds, runs on-device, and is validated by CI (253 unit tests, lint
 > green, R8 release pipeline validated) and by device testing on the owner's
 > own phone (Phases 4 and 5 manual checklists passed; Gemini tested live with
 > the owner's key). See [docs/ROADMAP.md](docs/ROADMAP.md) for the honest
@@ -108,7 +108,7 @@ signing (see [docs/RELEASE.md](docs/RELEASE.md)).
 
 | Layer | Tool / method | Status |
 |---|---|---|
-| JVM unit tests | `testDebugUnitTest` | Active — **254 tests, 0 failures** (CI) |
+| JVM unit tests | `testDebugUnitTest` | Active — **253 tests, 0 failures** (CI) |
 | Android lint | `lintDebug` (`abortOnError = true`) | Active (CI) |
 | Dependency review | PR checks | Active |
 | Dependabot | Weekly (Gradle + Actions) | Active |

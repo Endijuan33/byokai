@@ -108,7 +108,7 @@ Two different kinds of validation exist in this project and they are not
 interchangeable:
 
 - **Unit-tested (CI)** — JVM unit tests, lint, dependency review. All
-  phases are validated this way (254 unit tests green at 0.6.0).
+  phases are validated this way (253 unit tests green at 0.6.0).
 - **Device-tested (owner's own phone, own keys)** — manual checklists the
   owner runs on his own device. Completed: **Phase 4** (copy button,
   Prompts UI, link taps, system prompt per conversation, export/import)
