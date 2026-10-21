@@ -10,8 +10,10 @@ import com.byokai.domain.chat.ChatRepository
 import com.byokai.domain.chat.ChatRequest
 import com.byokai.domain.model.ChatMessage
 import com.byokai.domain.model.ChatRole
+import com.byokai.domain.model.PromptTemplate
 import com.byokai.domain.model.ProviderConfig
 import com.byokai.domain.repository.ConversationRepository
+import com.byokai.domain.repository.PromptRepository
 import com.byokai.domain.repository.ProviderConfigRepository
 import com.byokai.domain.security.CredentialStore
 import com.byokai.ui.common.userMessage
@@ -54,6 +56,16 @@ data class ChatUiState(
     val conversationId: String? = null,
     /** Title shown in the top bar; null falls back to the generic title. */
     val conversationTitle: String? = null,
+    /**
+     * System prompt of the active conversation (Milestone 4C); null
+     * when unset. Sent to the provider through the adapter's
+     * system-prompt channel — never as a user message.
+     */
+    val systemPrompt: String? = null,
+    /** Prompt templates offered in the system-prompt picker dialog. */
+    val prompts: List<PromptTemplate> = emptyList(),
+    /** Whether the system-prompt picker dialog is open. */
+    val systemPromptDialogOpen: Boolean = false,
     /**
      * The default title given at creation (localized by the screen).
      * The conversation is renamed from the first user message only
@@ -99,6 +111,7 @@ class ChatViewModel(
     private val configRepository: ProviderConfigRepository,
     private val credentialStore: CredentialStore,
     private val conversationRepository: ConversationRepository? = null,
+    private val promptRepository: PromptRepository? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -124,6 +137,16 @@ class ChatViewModel(
                     }
                     next
                 }
+            }
+        }
+        // Prompt templates for the per-conversation system-prompt
+        // picker (Milestone 4C). Seeded here as well as in the prompts
+        // screen so the picker has builtins even when the user never
+        // opened the management screen.
+        viewModelScope.launch {
+            promptRepository?.ensureSeeded()
+            promptRepository?.prompts()?.collect { prompts ->
+                _uiState.update { it.copy(prompts = prompts) }
             }
         }
     }
@@ -192,6 +215,8 @@ class ChatViewModel(
                 it.copy(
                     conversationId = id,
                     conversationTitle = conversation.title,
+                    systemPrompt = conversation.systemPrompt,
+                    systemPromptDialogOpen = false,
                     messages = stored.map { message ->
                         ChatUiMessage(
                             role = message.role,
@@ -256,11 +281,43 @@ class ChatViewModel(
                 conversationId = conversationId,
                 conversationTitle = conversationTitle,
                 defaultConversationTitle = defaultTitle,
+                systemPrompt = null,
+                systemPromptDialogOpen = false,
                 messages = emptyList(),
                 input = "",
                 generating = false,
                 error = null,
             )
+        }
+    }
+
+    /** Opens the per-conversation system-prompt picker dialog. */
+    fun openSystemPromptDialog() {
+        _uiState.update { it.copy(systemPromptDialogOpen = true) }
+    }
+
+    /** Closes the system-prompt picker without saving. */
+    fun closeSystemPromptDialog() {
+        _uiState.update { it.copy(systemPromptDialogOpen = false) }
+    }
+
+    /**
+     * Sets the active conversation's system prompt (null clears it).
+     * Persisted via [ConversationRepository.setSystemPrompt]; the next
+     * stream sends it through the adapter's system-prompt channel.
+     */
+    fun setSystemPrompt(systemPrompt: String?) {
+        val conversationId = _uiState.value.conversationId ?: return
+        val repository = conversationRepository ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(systemPromptDialogOpen = false) }
+            when (repository.setSystemPrompt(conversationId, systemPrompt?.ifBlank { null })) {
+                is Result.Success ->
+                    _uiState.update { it.copy(systemPrompt = systemPrompt?.ifBlank { null }) }
+                is Result.Error ->
+                    _uiState.update { it.copy(error = UiText.Res(R.string.conversations_save_error)) }
+                is Result.Loading -> Unit
+            }
         }
     }
 
@@ -492,7 +549,14 @@ class ChatViewModel(
             )
         }
         val job = viewModelScope.launch {
-            chatRepository.streamChat(ChatRequest(configId, modelId, requestMessages))
+            chatRepository.streamChat(
+                ChatRequest(
+                    providerConfigId = configId,
+                    modelId = modelId,
+                    messages = requestMessages,
+                    systemPrompt = state.systemPrompt,
+                ),
+            )
                 .collect { event ->
                     when (event) {
                         is ChatEvent.Delta -> appendDelta(event.text)

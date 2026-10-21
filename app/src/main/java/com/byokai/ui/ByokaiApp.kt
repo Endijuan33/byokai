@@ -9,6 +9,7 @@ import androidx.navigation.navArgument
 import com.byokai.ui.chat.ChatScreen
 import com.byokai.ui.conversations.ConversationsScreen
 import com.byokai.ui.home.HomeScreen
+import com.byokai.ui.prompts.PromptsScreen
 import com.byokai.ui.providers.ProvidersScreen
 import com.byokai.ui.settings.SettingsScreen
 
@@ -19,6 +20,7 @@ object Routes {
     const val PROVIDERS = "providers"
     const val CHAT = "chat"
     const val CONVERSATIONS = "conversations"
+    const val PROMPTS = "prompts"
 
     /**
      * Chat route: bare `"chat"` starts a new conversation,
@@ -49,7 +51,13 @@ fun ByokaiApp() {
             )
         }
         composable(Routes.SETTINGS) {
-            SettingsScreen(onBackClick = { navController.popBackStack() })
+            SettingsScreen(
+                onBackClick = { navController.popBackStack() },
+                onPromptsClick = { navController.navigate(Routes.PROMPTS) },
+            )
+        }
+        composable(Routes.PROMPTS) {
+            PromptsScreen(onBackClick = { navController.popBackStack() })
         }
         composable(Routes.PROVIDERS) {
             ProvidersScreen(onBackClick = { navController.popBackStack() })

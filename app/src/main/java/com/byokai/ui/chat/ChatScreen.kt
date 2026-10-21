@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -47,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -94,6 +96,7 @@ fun ChatScreen(
             container.providerConfigRepository,
             container.credentialStore,
             container.conversationRepository,
+            container.promptRepository,
         ),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -127,6 +130,15 @@ fun ChatScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.action_back),
+                        )
+                    }
+                },
+                actions = {
+                    // Per-conversation system prompt (Milestone 4C).
+                    IconButton(onClick = viewModel::openSystemPromptDialog) {
+                        Icon(
+                            imageVector = Icons.Filled.Tune,
+                            contentDescription = stringResource(R.string.chat_system_prompt),
                         )
                     }
                 },
@@ -197,6 +209,15 @@ fun ChatScreen(
                 }
             }
         }
+    }
+
+    if (uiState.systemPromptDialogOpen) {
+        SystemPromptDialog(
+            prompts = uiState.prompts,
+            currentSystemPrompt = uiState.systemPrompt,
+            onDismiss = viewModel::closeSystemPromptDialog,
+            onSave = viewModel::setSystemPrompt,
+        )
     }
 }
 
@@ -447,15 +468,24 @@ private fun MessageBubble(
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 if (message.text.isNotEmpty()) {
-                    Text(
-                        text = message.text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (isUser) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
+                    if (isUser) {
+                        Text(
+                            text = message.text,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    } else {
+                        // Read the ambient (platform) handler OUTSIDE the
+                        // provider override below: AssistantMarkdownText
+                        // replaces LocalUriHandler internally with the
+                        // safe variant, which calls back here only after
+                        // the URL passed LinkSafety.
+                        val platformUriHandler = LocalUriHandler.current
+                        AssistantMarkdownText(
+                            text = message.text,
+                            onLinkClick = { url -> platformUriHandler.openUri(url) },
+                        )
+                    }
                 }
                 if (showGenerating && message.text.isEmpty()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
