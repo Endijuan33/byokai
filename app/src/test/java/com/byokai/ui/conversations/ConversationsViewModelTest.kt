@@ -5,7 +5,7 @@ import com.byokai.core.common.Result
 import com.byokai.core.common.UiText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -69,31 +69,29 @@ class ConversationsViewModelTest {
     fun `create emits the new id for navigation`() = runTest(testDispatcher) {
         val repo = FakeConversationRepository()
         val vm = viewModel(repo)
-        val opened = mutableListOf<String>()
-        backgroundScope.launch { vm.openConversation.collect { opened.add(it) } }
 
         vm.createConversation("New conversation")
         advanceUntilIdle()
 
-        assertEquals(1, opened.size)
-        assertEquals("New conversation", repo.get(opened[0])?.title)
+        // The channel is BUFFERED so trySend cannot lose the event; first()
+        // picks it up deterministically without a background collector.
+        val openedId = vm.openConversation.first()
+        assertEquals("New conversation", repo.get(openedId)?.title)
         // The list flow picks the new row up too.
-        assertTrue(vm.uiState.value.conversations.any { it.id == opened[0] })
+        assertTrue(vm.uiState.value.conversations.any { it.id == openedId })
     }
 
     @Test
     fun `create failure surfaces an error`() = runTest(testDispatcher) {
         val repo = FakeConversationRepository().also { it.failWrites = true }
         val vm = viewModel(repo)
-        val errors = mutableListOf<UiText>()
-        backgroundScope.launch { vm.errors.collect { errors.add(it) } }
 
         vm.createConversation("New conversation")
         advanceUntilIdle()
 
         assertEquals(
-            listOf(UiText.Res(R.string.conversations_create_error)),
-            errors,
+            UiText.Res(R.string.conversations_create_error),
+            vm.errors.first(),
         )
     }
 
@@ -128,8 +126,6 @@ class ConversationsViewModelTest {
             val repo = FakeConversationRepository()
             val id = (repo.create("Doomed") as Result.Success).data.id
             val vm = viewModel(repo)
-            val errors = mutableListOf<UiText>()
-            backgroundScope.launch { vm.errors.collect { errors.add(it) } }
 
             repo.failWrites = true
             vm.requestDelete(id)
@@ -138,8 +134,8 @@ class ConversationsViewModelTest {
 
             assertNull(vm.uiState.value.pendingDeleteId)
             assertEquals(
-                listOf(UiText.Res(R.string.conversations_delete_error)),
-                errors,
+                UiText.Res(R.string.conversations_delete_error),
+                vm.errors.first(),
             )
             assertNotNull(repo.get(id))
         }
