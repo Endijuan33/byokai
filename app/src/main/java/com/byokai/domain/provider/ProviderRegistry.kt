@@ -1,5 +1,7 @@
 package com.byokai.domain.provider
 
+import com.byokai.domain.model.ProviderId
+
 /**
  * Registry of the [AiProvider] adapters available at runtime.
  *
