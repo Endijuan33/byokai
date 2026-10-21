@@ -46,6 +46,8 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+# NOTE: no kotlin-android entry on purpose. AGP 9.x has built-in Kotlin support
+# and applying org.jetbrains.kotlin.android is a build error. The Kotlin
+# toolchain version is pinned by the Compose compiler plugin version instead.
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

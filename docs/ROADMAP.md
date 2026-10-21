@@ -72,7 +72,7 @@ quality/security audits.
 | Artifact | Version | Source |
 |---|---|---|
 | AGP | 9.4.1 | developer.android.com release notes |
-| Kotlin | 2.4.21 | kotlinlang.org releases |
+| Kotlin | 2.4.21 | kotlinlang.org releases; pinned via the applied `org.jetbrains.kotlin.plugin.compose` plugin version (AGP 9.x built-in Kotlin — the legacy `kotlin-android` plugin is not applied) |
 | Gradle | 9.8.0 | gradle.org releases |
 | JDK | 17 (Temurin) | actions/setup-java |
 | compileSdk / targetSdk | 37 | Android 17, stable Jun 2026 |

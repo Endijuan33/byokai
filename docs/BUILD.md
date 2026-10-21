@@ -28,6 +28,15 @@ All actions are pinned to full semver tags (verified 2026-10-21):
 JDK 17 (Temurin) · Gradle 9.8.0 · AGP 9.4.1 · Kotlin 2.4.21 ·
 compileSdk/targetSdk 37 · minSdk 28.
 
+**Built-in Kotlin:** AGP 9.x compiles Kotlin without the legacy
+`org.jetbrains.kotlin.android` plugin — applying it is a build error
+([migration guide](https://developer.android.com/build/migrate-to-built-in-kotlin)).
+The Kotlin toolchain version (2.4.21) is pinned by the version of the applied
+`org.jetbrains.kotlin.plugin.compose` compiler plugin, which raises AGP's
+KGP floor to match. Compiler options use the top-level
+`kotlin { compilerOptions { } }` block; `jvmTarget` follows
+`compileOptions.targetCompatibility` (17) unless overridden.
+
 ## Gradle wrapper note
 
 This repository does **not** ship a Gradle wrapper yet: the project

@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    // NOTE: org.jetbrains.kotlin.android is intentionally NOT applied.
+    // AGP 9.x ships built-in Kotlin support; applying the old plugin is an
+    // error. The Kotlin toolchain version (2.4.21) is pinned by the
+    // Compose compiler plugin below. See docs/BUILD.md.
     alias(libs.plugins.kotlin.compose)
 }
 
