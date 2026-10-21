@@ -21,7 +21,6 @@ import java.net.SocketTimeoutException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -80,135 +79,138 @@ class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
         apiKey: String,
         request: ChatRequest,
     ): Flow<ChatEvent> = callbackFlow {
-        when (val validation = EndpointValidator.validate(config.baseUrl)) {
-            is EndpointValidation.Invalid -> {
-                trySend(
-                    ChatEvent.Error(
-                        ProviderError.Server(0, "Invalid endpoint: ${validation.reason}"),
+        var call: Call? = null
+        // Prompt cancellation: when the collector is cancelled, the channel's
+        // close handler cancels the in-flight HTTP call, unblocking the
+        // socket read immediately. Note: kotlinx.coroutines 1.11.0 has no
+        // Job.invokeOnClose, and its awaitClose lives in
+        // kotlinx.coroutines.channels and must not be combined with another
+        // invokeOnClose handler — so a single SendChannel.invokeOnClose
+        // handler is used instead.
+        channel.invokeOnClose { call?.cancel() }
+        try {
+            val baseUrl = when (val validation = EndpointValidator.validate(config.baseUrl)) {
+                is EndpointValidation.Invalid -> {
+                    trySend(
+                        ChatEvent.Error(
+                            ProviderError.Server(0, "Invalid endpoint: ${validation.reason}"),
+                        ),
+                    )
+                    null
+                }
+                is EndpointValidation.Valid -> config.baseUrl.trimEnd('/')
+            }
+            if (baseUrl != null) {
+                val url = baseUrl + CHAT_COMPLETIONS_PATH
+                val bodyJson = ProviderJson.encodeToString(
+                    ChatCompletionsRequest(
+                        model = request.modelId,
+                        messages = toDtoMessages(request),
                     ),
                 )
-                close()
-                return@callbackFlow
-            }
-            is EndpointValidation.Valid -> Unit
-        }
-
-        val url = config.baseUrl.trimEnd('/') + CHAT_COMPLETIONS_PATH
-        val bodyJson = ProviderJson.encodeToString(
-            ChatCompletionsRequest(
-                model = request.modelId,
-                messages = toDtoMessages(request),
-            ),
-        )
-
-        // Cancellation: when the collector is cancelled, awaitClose's
-        // block cancels the in-flight call, which unblocks the socket
-        // read. (kotlinx.coroutines 1.11.0: awaitClose lives in
-        // kotlinx.coroutines.channels, not ...flow.)
-        var call: Call? = null
-        try {
-            var attempt = 0
-            var streamStarted = false
-            val fullText = StringBuilder()
-            while (true) {
-                ensureActive()
-                val httpRequest = Request.Builder()
-                    .url(url)
-                    .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
-                    .header("Authorization", "Bearer $apiKey")
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "text/event-stream")
-                    .build()
-                call = client.newCall(httpRequest)
-                try {
-                    val response = call.execute()
+                var attempt = 0
+                var streamStarted = false
+                val fullText = StringBuilder()
+                streamLoop@ while (true) {
+                    ensureActive()
+                    val httpRequest = Request.Builder()
+                        .url(url)
+                        .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
+                        .header("Authorization", "Bearer $apiKey")
+                        .header("Content-Type", "application/json")
+                        .header("Accept", "text/event-stream")
+                        .build()
+                    call = client.newCall(httpRequest)
                     try {
-                        if (!response.isSuccessful) {
-                            val errorBody = readBodyCapped(response, MAX_ERROR_BODY_BYTES)
-                            val error = normalizeHttpError(
-                                response.code,
-                                errorBody,
-                                response.header("Retry-After"),
-                            )
-                            val decision = RetryPolicy.decide(attempt, error, streamStarted)
-                            if (decision.shouldRetry) {
-                                attempt++
-                                delay(decision.delayMillis)
-                                continue
-                            }
-                            trySend(ChatEvent.Error(error))
-                            return@callbackFlow
-                        }
+                        val response = call.execute()
                         try {
-                            SseReader.readAll(response.body.source()) { message ->
-                                ensureActive()
-                                if (message.data.isBlank()) return@readAll
-                                if (message.data == DONE_SENTINEL) {
-                                    trySend(ChatEvent.Done(fullText.toString()))
-                                    throw TerminalEventSent()
+                            if (!response.isSuccessful) {
+                                val errorBody = readBodyCapped(response, MAX_ERROR_BODY_BYTES)
+                                val error = normalizeHttpError(
+                                    response.code,
+                                    errorBody,
+                                    response.header("Retry-After"),
+                                )
+                                val decision = RetryPolicy.decide(attempt, error, streamStarted)
+                                if (decision.shouldRetry) {
+                                    attempt++
+                                    delay(decision.delayMillis)
+                                    continue@streamLoop
                                 }
-                                val chunk = try {
-                                    ProviderJson.decodeFromString<ChatCompletionsChunk>(
-                                        message.data,
-                                    )
-                                } catch (_: SerializationException) {
-                                    trySend(
-                                        ChatEvent.Error(
-                                            ProviderError.Parse("Malformed SSE data chunk"),
-                                        ),
-                                    )
-                                    throw TerminalEventSent()
-                                }
-                                val text = chunk.choices.firstOrNull()?.delta?.content
-                                if (!text.isNullOrEmpty()) {
-                                    fullText.append(text)
-                                    streamStarted = true
-                                    trySend(ChatEvent.Delta(text))
-                                }
+                                trySend(ChatEvent.Error(error))
+                                break@streamLoop
                             }
-                            trySend(
-                                ChatEvent.Error(
-                                    ProviderError.Parse("stream ended without [DONE]"),
-                                ),
-                            )
-                        } catch (_: TerminalEventSent) {
-                            // Terminal event already emitted; fall through to close.
+                            try {
+                                SseReader.readAll(response.body.source()) { message ->
+                                    currentCoroutineContext().ensureActive()
+                                    if (message.data.isBlank()) return@readAll
+                                    if (message.data == DONE_SENTINEL) {
+                                        trySend(ChatEvent.Done(fullText.toString()))
+                                        throw TerminalEventSent()
+                                    }
+                                    val chunk = try {
+                                        ProviderJson.decodeFromString<ChatCompletionsChunk>(
+                                            message.data,
+                                        )
+                                    } catch (_: SerializationException) {
+                                        trySend(
+                                            ChatEvent.Error(
+                                                ProviderError.Parse("Malformed SSE data chunk"),
+                                            ),
+                                        )
+                                        throw TerminalEventSent()
+                                    }
+                                    val text = chunk.choices.firstOrNull()?.delta?.content
+                                    if (!text.isNullOrEmpty()) {
+                                        fullText.append(text)
+                                        streamStarted = true
+                                        trySend(ChatEvent.Delta(text))
+                                    }
+                                }
+                                trySend(
+                                    ChatEvent.Error(
+                                        ProviderError.Parse("stream ended without [DONE]"),
+                                    ),
+                                )
+                            } catch (_: TerminalEventSent) {
+                                // Terminal event already sent.
+                            }
+                            break@streamLoop
+                        } finally {
+                            response.close()
                         }
-                        return@callbackFlow
-                    } finally {
-                        response.close()
+                    } catch (_: SocketTimeoutException) {
+                        currentCoroutineContext().ensureActive()
+                        val decision =
+                            RetryPolicy.decide(attempt, ProviderError.Timeout, streamStarted)
+                        if (decision.shouldRetry) {
+                            attempt++
+                            delay(decision.delayMillis)
+                            continue@streamLoop
+                        }
+                        trySend(ChatEvent.Error(ProviderError.Timeout))
+                        break@streamLoop
+                    } catch (e: IOException) {
+                        currentCoroutineContext().ensureActive()
+                        val error = ProviderError.Network(e)
+                        val decision = RetryPolicy.decide(attempt, error, streamStarted)
+                        if (decision.shouldRetry) {
+                            attempt++
+                            delay(decision.delayMillis)
+                            continue@streamLoop
+                        }
+                        trySend(ChatEvent.Error(error))
+                        break@streamLoop
                     }
-                } catch (_: SocketTimeoutException) {
-                    ensureActive()
-                    val decision =
-                        RetryPolicy.decide(attempt, ProviderError.Timeout, streamStarted)
-                    if (decision.shouldRetry) {
-                        attempt++
-                        delay(decision.delayMillis)
-                        continue
-                    }
-                    trySend(ChatEvent.Error(ProviderError.Timeout))
-                    return@callbackFlow
-                } catch (e: IOException) {
-                    // InterruptedIOException from call.cancel() arrives here on
-                    // collector cancellation; ensureActive rethrows
-                    // CancellationException so cancellation is never swallowed.
-                    ensureActive()
-                    val error = ProviderError.Network(e)
-                    val decision = RetryPolicy.decide(attempt, error, streamStarted)
-                    if (decision.shouldRetry) {
-                        attempt++
-                        delay(decision.delayMillis)
-                        continue
-                    }
-                    trySend(ChatEvent.Error(error))
-                    return@callbackFlow
                 }
             }
         } finally {
             call?.cancel()
         }
-        awaitClose { call?.cancel() }
+        // Close the channel on normal completion: callbackFlow requires the
+        // channel to be closed for send when the block returns, otherwise
+        // collection throws IllegalStateException.
+        close()
     }.flowOn(Dispatchers.IO)
 
     /**
