@@ -119,7 +119,10 @@ class TinkCredentialStoreTest {
     @Test
     fun `KeyInvalidated from the provider wipes storage and returns KeyInvalidated`() =
         runTest {
-            storage.raw["credential_openai-work"] = "undecryptable-stale-ciphertext"
+            // Valid Base64 (as a real store would hold) so decoding succeeds
+            // and the provider — which reports the invalidation — is reached.
+            storage.raw["credential_openai-work"] =
+                Base64.getEncoder().encodeToString("stale-ciphertext".toByteArray())
             val invalidatedProvider = object : AeadProvider {
                 override fun get(): Aead = throw KeyInvalidatedException()
             }
