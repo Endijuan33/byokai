@@ -17,9 +17,9 @@ android {
         applicationId = "com.byokai"
         minSdk = 28
         targetSdk = 37
-        versionCode = 4
+        versionCode = 5
         // Overridable from the release workflow via -Pbyokai.versionName=<x.y.z>.
-        versionName = (findProperty("byokai.versionName") as String?) ?: "0.4.0"
+        versionName = (findProperty("byokai.versionName") as String?) ?: "0.5.0"
         // Milestone 3B ships an instrumented test for the keystore-backed
         // credential path; runs on-device only (Phase 5 device matrix), not CI.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -65,8 +65,10 @@ android {
         }
         release {
             signingConfig = signingConfigs.getByName("release")
-            // R8 / minification is intentionally OFF in Phase 1 and lands in Phase 5
-            // (security & compatibility) together with a full ProGuard rules review.
+            // R8 / minification is intentionally OFF and lands in the
+            // security & compatibility phase (now Phase 6 after the
+            // Phase 5 scope change) together with a full ProGuard rules
+            // review.
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

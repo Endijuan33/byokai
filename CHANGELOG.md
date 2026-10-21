@@ -5,6 +5,48 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-22
+
+Phase 5: Reliability & Conversation Experience.
+
+### Added
+
+- `ProviderError.EmptyResponse`: a successful-but-empty completion is
+  normalized by `ChatRepositoryImpl` to a typed error, so the UI shows
+  a friendly message (EN/ID) instead of an empty bubble — and nothing
+  empty is persisted.
+
+### Fixed
+
+- Double-tap/rapid double `send()` can no longer persist the user turn
+  twice or start two streams: the send is now claimed synchronously
+  (compare-and-set on `canSend`); failed claims return null and abort
+  paths release the claim.
+- `stop()` immediately followed by `send()` keeps database turn order:
+  the partial-turn persist job is tracked and joined before the new
+  user turn is written.
+- Switching provider or model mid-stream now stops the stale stream
+  first (partial text kept, persisted when a conversation is active)
+  instead of silently continuing under the new selection.
+- Code-block copy button (follow-up to 4B): the 0.4.0 note overstated
+  this — the renderer's default code block never shows its header row
+  (`showHeader` defaults to false, verified in 0.46.0 sources). 0.5.0
+  wires custom code-block components that enable the header explicitly
+  (language label + copy button).
+
+### Security
+
+- `docs/SECURITY.md` now states explicitly that export files are
+  plaintext JSON and securing them is the user's responsibility.
+
+### Changed
+
+- Debug signing: committed a stable debug-only keystore
+  (`debug.keystore`, documented in `docs/BUILD.md`) so every CI/local
+  build shares one debug signature and debug APK updates install
+  cleanly (`INSTALL_FAILED_UPDATE_INCOMPATIBLE` fixed). Never for
+  release signing.
+
 ## [0.4.0] — 2026-10-22
 
 Phase 4: Advanced Chat Experience, Prompt Management & Data Portability

@@ -88,13 +88,27 @@ explicitly not done in CI (no real keys in this repository, ever).
 - Not shipped (remain future work): vision/file input, tool calling,
   agent orchestration.
 
-## Phase 5 — Security and compatibility — NOT STARTED
+## Phase 5 — Reliability & Conversation Experience — SHIPPED (0.5.0)
 
-## Phase 5 — Security and compatibility — NOT STARTED
+Reliability and error handling (synchronous send claim against
+double-tap duplicates, empty-response error, no silent request
+repetition, cancellation that really stops, loading/error states that
+always recover), conversation experience (turn-order-safe stop/send
+sequencing, mid-stream provider/model switch stops the stale stream,
+retry-after-failure kept), context/token audit (4D policy verified:
+system prompt + newest messages prioritized, "est." labeling kept
+honest, conservative fallback retained — per-model context windows
+deliberately not hardcoded: providers don't report them and tables go
+stale), security/privacy audit (no credential in logs/errors/exports;
+export files documented as plaintext JSON, user-responsible).
+Acceptance: build + full unit suite green, no known Phase 4
+regressions, manual device checklist in the Phase 5 report.
+
+## Phase 6 — Security and compatibility — NOT STARTED
 
 Network/storage audit, permission review, API-level behavior matrix
 (28–37), R8/minification enablement with reviewed ProGuard rules,
-dependency security audit, database migration tests, privacy review.
+dependency security audit, privacy review.
 Acceptance: documented test matrix with real device/emulator results.
 
 ## Phase 6 — Release engineering — NOT STARTED
@@ -119,7 +133,8 @@ quality/security audits.
   2.8.5 needs KSP). Phase 3 ships conversation persistence anyway, as
   hand-rolled SQLite (`androidx.sqlite:sqlite-framework:2.7.1`); Room
   stays the long-term option once KSP supports Kotlin 2.4.x.
-- **R8/minification:** intentionally off until Phase 5.
+- **R8/minification:** intentionally off until the security &
+  compatibility phase (now Phase 6 after the Phase 5 scope change).
 
 ## Version decisions (all verified 2026-10-21 unless marked otherwise)
 
