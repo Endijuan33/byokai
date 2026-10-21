@@ -113,4 +113,33 @@
     <string name="conversations_save_error">Gagal menyimpan ke riwayat percakapan. Coba lagi.</string>
     <string name="conversations_delete_error">Gagal menghapus percakapan. Coba lagi.</string>
     <string name="conversations_not_found">Percakapan tidak ditemukan.</string>
+    <!-- Prompts (templat system-prompt) -->
+    <string name="prompts_title">Prompt</string>
+    <string name="prompts_empty_title">Belum ada prompt</string>
+    <string name="prompts_empty_body">Buat system prompt yang dapat dipakai ulang, atau tunggu prompt bawaan muncul.</string>
+    <string name="prompts_add">Tambah prompt</string>
+    <string name="prompts_edit">Ubah prompt</string>
+    <string name="prompts_delete">Hapus</string>
+    <string name="prompts_save">Simpan</string>
+    <string name="prompts_cancel">Batal</string>
+    <string name="prompts_builtin_chip">Bawaan</string>
+    <string name="prompts_create_title">Prompt baru</string>
+    <string name="prompts_edit_title">Ubah prompt</string>
+    <string name="prompts_editor_title_label">Judul</string>
+    <string name="prompts_editor_content_label">Teks prompt</string>
+    <string name="prompts_delete_title">Hapus prompt?</string>
+    <string name="prompts_delete_body">Hapus \"%1$s\"? Tindakan ini tidak dapat dibatalkan.</string>
+    <string name="prompts_blank_error">Judul dan teks prompt tidak boleh kosong.</string>
+    <string name="prompts_save_error">Gagal menyimpan prompt. Coba lagi.</string>
+    <string name="prompts_delete_error">Gagal menghapus prompt. Coba lagi.</string>
+    <string name="prompts_seed_error">Gagal memuat prompt bawaan. Coba lagi.</string>
+    <string name="settings_section_prompts">Prompt</string>
+    <string name="settings_prompts">Templat prompt</string>
+    <string name="settings_prompts_summary">Kelola system prompt yang dapat dipakai ulang</string>
+    <!-- System prompt per percakapan -->
+    <string name="chat_system_prompt">System prompt</string>
+    <string name="chat_system_prompt_title">System prompt percakapan</string>
+    <string name="chat_system_prompt_body">Pilih templat atau tulis instruksi kustom. Dikirim ke provider sebagai system prompt — bukan sebagai pesan user. Kosongkan bila tidak perlu.</string>
+    <string name="chat_system_prompt_label">System prompt</string>
+    <string name="chat_system_prompt_hint">mis. Kamu adalah asisten yang ringkas…</string>
 </resources>

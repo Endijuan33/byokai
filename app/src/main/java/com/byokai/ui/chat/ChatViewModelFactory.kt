@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.byokai.domain.chat.ChatRepository
 import com.byokai.domain.repository.ConversationRepository
+import com.byokai.domain.repository.PromptRepository
 import com.byokai.domain.repository.ProviderConfigRepository
 import com.byokai.domain.security.CredentialStore
 
@@ -22,6 +23,7 @@ class ChatViewModelFactory(
     private val configRepository: ProviderConfigRepository,
     private val credentialStore: CredentialStore,
     private val conversationRepository: ConversationRepository,
+    private val promptRepository: PromptRepository,
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
@@ -34,6 +36,7 @@ class ChatViewModelFactory(
             configRepository,
             credentialStore,
             conversationRepository,
+            promptRepository,
         ) as T
     }
 }

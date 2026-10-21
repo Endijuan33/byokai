@@ -324,6 +324,17 @@ class GeminiAdapterTest {
             "Be nice.",
             systemParts[1].jsonObject["text"]!!.jsonPrimitive.content,
         )
+        // The system prompt travels ONLY via `systemInstruction` — it
+        // must never leak into the user/model content parts.
+        val contentTexts = contents.flatMap { content ->
+            content.jsonObject["parts"]!!.jsonArray.map { part ->
+                part.jsonObject["text"]!!.jsonPrimitive.content
+            }
+        }
+        assertTrue(
+            "request body was: $body",
+            contentTexts.none { it.contains("You are helpful.") },
+        )
     }
 
     @Test

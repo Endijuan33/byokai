@@ -322,6 +322,15 @@ class AnthropicAdapterTest {
         assertEquals(1, messages.size)
         assertEquals("user", messages[0].jsonObject["role"]!!.jsonPrimitive.content)
         assertEquals("Hello", messages[0].jsonObject["content"]!!.jsonPrimitive.content)
+        // The system prompt travels ONLY via the `system` field — it
+        // must never leak into user message content.
+        assertTrue(
+            "request body was: $body",
+            messages.none { message ->
+                message.jsonObject["content"]!!.jsonPrimitive.content
+                    .contains("You are helpful.")
+            },
+        )
     }
 
     @Test

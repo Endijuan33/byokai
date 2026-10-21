@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -57,7 +58,10 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBackClick: () -> Unit) {
+fun SettingsScreen(
+    onBackClick: () -> Unit,
+    onPromptsClick: () -> Unit,
+) {
     val context = LocalContext.current
     val application = context.applicationContext as ByokaiApplication
     val viewModel: SettingsViewModel = viewModel(
@@ -146,6 +150,16 @@ fun SettingsScreen(onBackClick: () -> Unit) {
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+            SectionTitle(stringResource(R.string.settings_section_prompts))
+
+            NavRow(
+                title = stringResource(R.string.settings_prompts),
+                summary = stringResource(R.string.settings_prompts_summary),
+                onClick = onPromptsClick,
+            )
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
             SectionTitle(stringResource(R.string.settings_section_about))
 
             InfoRow(
@@ -222,6 +236,28 @@ private fun SwitchRow(
             )
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+/** Navigation row: title + summary, whole row tappable. */
+@Composable
+private fun NavRow(title: String, summary: String, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = summary,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

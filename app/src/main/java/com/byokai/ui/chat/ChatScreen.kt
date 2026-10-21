@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -95,6 +96,7 @@ fun ChatScreen(
             container.providerConfigRepository,
             container.credentialStore,
             container.conversationRepository,
+            container.promptRepository,
         ),
     )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -128,6 +130,15 @@ fun ChatScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.action_back),
+                        )
+                    }
+                },
+                actions = {
+                    // Per-conversation system prompt (Milestone 4C).
+                    IconButton(onClick = viewModel::openSystemPromptDialog) {
+                        Icon(
+                            imageVector = Icons.Filled.Tune,
+                            contentDescription = stringResource(R.string.chat_system_prompt),
                         )
                     }
                 },
@@ -198,6 +209,15 @@ fun ChatScreen(
                 }
             }
         }
+    }
+
+    if (uiState.systemPromptDialogOpen) {
+        SystemPromptDialog(
+            prompts = uiState.prompts,
+            currentSystemPrompt = uiState.systemPrompt,
+            onDismiss = viewModel::closeSystemPromptDialog,
+            onSave = viewModel::setSystemPrompt,
+        )
     }
 }
 

@@ -113,4 +113,33 @@
     <string name="conversations_save_error">Could not save to conversation history. Please try again.</string>
     <string name="conversations_delete_error">Could not delete the conversation. Please try again.</string>
     <string name="conversations_not_found">Conversation not found.</string>
+    <!-- Prompts (system-prompt templates) -->
+    <string name="prompts_title">Prompts</string>
+    <string name="prompts_empty_title">No prompts yet</string>
+    <string name="prompts_empty_body">Create a reusable system prompt, or wait for the built-in ones to appear.</string>
+    <string name="prompts_add">Add prompt</string>
+    <string name="prompts_edit">Edit prompt</string>
+    <string name="prompts_delete">Delete</string>
+    <string name="prompts_save">Save</string>
+    <string name="prompts_cancel">Cancel</string>
+    <string name="prompts_builtin_chip">Built-in</string>
+    <string name="prompts_create_title">New prompt</string>
+    <string name="prompts_edit_title">Edit prompt</string>
+    <string name="prompts_editor_title_label">Title</string>
+    <string name="prompts_editor_content_label">Prompt text</string>
+    <string name="prompts_delete_title">Delete prompt?</string>
+    <string name="prompts_delete_body">Delete \"%1$s\"? This cannot be undone.</string>
+    <string name="prompts_blank_error">Title and prompt text must not be empty.</string>
+    <string name="prompts_save_error">Could not save the prompt. Please try again.</string>
+    <string name="prompts_delete_error">Could not delete the prompt. Please try again.</string>
+    <string name="prompts_seed_error">Could not load the built-in prompts. Please try again.</string>
+    <string name="settings_section_prompts">Prompts</string>
+    <string name="settings_prompts">Prompt templates</string>
+    <string name="settings_prompts_summary">Manage reusable system prompts</string>
+    <!-- Per-conversation system prompt -->
+    <string name="chat_system_prompt">System prompt</string>
+    <string name="chat_system_prompt_title">Conversation system prompt</string>
+    <string name="chat_system_prompt_body">Pick a template or write custom instructions. Sent to the provider as the system prompt — never as a user message. Leave empty for none.</string>
+    <string name="chat_system_prompt_label">System prompt</string>
+    <string name="chat_system_prompt_hint">e.g. You are a concise assistant…</string>
 </resources>

@@ -251,6 +251,17 @@ class OpenAiAdapterTest {
         )
         assertEquals("user", messages[1].jsonObject["role"]!!.jsonPrimitive.content)
         assertEquals("Hello", messages[1].jsonObject["content"]!!.jsonPrimitive.content)
+        // The system prompt travels ONLY via the system message — it
+        // must never leak into user message content.
+        assertTrue(
+            "request body was: $body",
+            messages
+                .filter { it.jsonObject["role"]!!.jsonPrimitive.content != "system" }
+                .none { message ->
+                    message.jsonObject["content"]!!.jsonPrimitive.content
+                        .contains("You are helpful.")
+                },
+        )
     }
 
     @Test
