@@ -142,4 +142,7 @@
     <string name="chat_system_prompt_body">Pilih templat atau tulis instruksi kustom. Dikirim ke provider sebagai system prompt — bukan sebagai pesan user. Kosongkan bila tidak perlu.</string>
     <string name="chat_system_prompt_label">System prompt</string>
     <string name="chat_system_prompt_hint">mis. Kamu adalah asisten yang ringkas…</string>
+    <!-- Estimasi konteks (heuristik, berlabel "est.") -->
+    <string name="chat_context_estimate">est. %1$s token</string>
+    <string name="chat_context_truncated">%1$d pesan lama dipangkas dari request</string>
 </resources>

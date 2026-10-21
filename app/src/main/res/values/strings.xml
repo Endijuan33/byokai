@@ -142,4 +142,7 @@
     <string name="chat_system_prompt_body">Pick a template or write custom instructions. Sent to the provider as the system prompt — never as a user message. Leave empty for none.</string>
     <string name="chat_system_prompt_label">System prompt</string>
     <string name="chat_system_prompt_hint">e.g. You are a concise assistant…</string>
+    <!-- Context estimate (heuristic, labeled "est.") -->
+    <string name="chat_context_estimate">est. %1$s tokens</string>
+    <string name="chat_context_truncated">%1$d older messages truncated from request</string>
 </resources>

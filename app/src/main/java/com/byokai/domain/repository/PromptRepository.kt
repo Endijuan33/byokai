@@ -1,5 +1,6 @@
 package com.byokai.domain.repository
 
+import com.byokai.core.common.Result
 import com.byokai.domain.model.BuiltinPrompts
 import com.byokai.domain.model.PromptTemplate
 import kotlinx.coroutines.flow.Flow

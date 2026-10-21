@@ -3,6 +3,7 @@ package com.byokai.ui.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.byokai.R
+import com.byokai.core.chat.ContextPolicy
 import com.byokai.core.common.Result
 import com.byokai.core.common.UiText
 import com.byokai.domain.chat.ChatEvent
@@ -19,9 +20,13 @@ import com.byokai.domain.security.CredentialStore
 import com.byokai.ui.common.userMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -116,6 +121,34 @@ class ChatViewModel(
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    /**
+     * The planned request context (Milestone 4D): which messages will
+     * actually be sent next, how many of the oldest were truncated, and
+     * the heuristic token ESTIMATE (labeled "est." in the UI — never an
+     * official provider count).
+     *
+     * Derived from [uiState], so the label tracks the conversation as
+     * it grows. Truncation here mirrors exactly what [startStream]
+     * sends; persisted history is never affected.
+     */
+    val contextPlan: StateFlow<ContextPolicy.Plan?> = uiState
+        .map { state ->
+            if (state.messages.isEmpty() && state.systemPrompt.isNullOrBlank()) {
+                null
+            } else {
+                ContextPolicy.plan(
+                    messages = state.messages.map { ChatMessage(it.role, it.text) },
+                    systemPrompt = state.systemPrompt,
+                    // Adapters do not report context windows yet
+                    // (ModelInfo.contextWindow is null); the policy's
+                    // conservative fallback caps apply.
+                    contextWindow = null,
+                )
+            }
+        }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private var streamJob: Job? = null
 
@@ -541,6 +574,17 @@ class ChatViewModel(
         val modelId = state.selectedModelId ?: return null
         if (state.keyReady[configId] != true) return null
         val requestMessages = baseMessages.map { ChatMessage(it.role, it.text) }
+        // Request-side truncation only (Milestone 4D): the persisted
+        // history keeps every turn; the provider receives the newest
+        // messages that fit the context budget.
+        val plan = ContextPolicy.plan(
+            messages = requestMessages,
+            systemPrompt = state.systemPrompt,
+            // Adapters do not report context windows yet
+            // (ModelInfo.contextWindow is null); the policy's
+            // conservative fallback caps apply.
+            contextWindow = null,
+        )
         _uiState.update {
             it.copy(
                 messages = baseMessages + ChatUiMessage(ChatRole.ASSISTANT, "", isPending = true),
@@ -553,7 +597,7 @@ class ChatViewModel(
                 ChatRequest(
                     providerConfigId = configId,
                     modelId = modelId,
-                    messages = requestMessages,
+                    messages = plan.messages,
                     systemPrompt = state.systemPrompt,
                 ),
             )

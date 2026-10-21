@@ -198,6 +198,11 @@ fun ChatScreen(
                         modifier = Modifier.weight(1f),
                     )
 
+                    // Subtle heuristic context estimate (Milestone 4D):
+                    // "est." labeled, never an official provider count.
+                    val plan by viewModel.contextPlan.collectAsStateWithLifecycle()
+                    ContextEstimateLabel(plan = plan)
+
                     InputRow(
                         input = uiState.input,
                         canSend = uiState.canSend,
