@@ -18,12 +18,14 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.content
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
-import mockwebserver3.SocketPolicy
+import mockwebserver3.SocketEffect
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -48,7 +50,7 @@ class OpenAiAdapterTest {
 
     @After
     fun tearDown() {
-        server.shutdown()
+        server.close()
     }
 
     private fun config(baseUrl: String = server.url("/").toString().trimEnd('/')) =
@@ -233,9 +235,9 @@ class OpenAiAdapterTest {
         collectAll(systemPrompt = "You are helpful.")
 
         val recorded = server.takeRequest(10, TimeUnit.SECONDS)!!
-        assertEquals("/v1/chat/completions", recorded.path)
-        assertEquals("Bearer test-key-123", recorded.getHeader("Authorization"))
-        val body = ProviderJson.parseToJsonElement(recorded.body.utf8()).jsonObject
+        assertEquals("/v1/chat/completions", recorded.target)
+        assertEquals("Bearer test-key-123", recorded.headers["Authorization"])
+        val body = ProviderJson.parseToJsonElement(recorded.body?.utf8().orEmpty()).jsonObject
         assertEquals(true, body["stream"]!!.jsonPrimitive.boolean)
         assertEquals("gpt-4o", body["model"]!!.jsonPrimitive.content)
         val messages = body["messages"]!!.jsonArray
@@ -256,7 +258,7 @@ class OpenAiAdapterTest {
         collectAll(systemPrompt = "   ")
 
         val recorded = server.takeRequest(10, TimeUnit.SECONDS)!!
-        val messages = ProviderJson.parseToJsonElement(recorded.body.utf8())
+        val messages = ProviderJson.parseToJsonElement(recorded.body?.utf8().orEmpty())
             .jsonObject["messages"]!!.jsonArray
         assertEquals(1, messages.size)
         assertEquals("user", messages[0].jsonObject["role"]!!.jsonPrimitive.content)
@@ -300,14 +302,23 @@ class OpenAiAdapterTest {
             MockResponse.Builder()
                 .code(200)
                 .addHeader("Content-Type", "text/event-stream")
-                .socketPolicy(SocketPolicy.NO_RESPONSE)
+                .onRequestStart(SocketEffect.Stall)
+                .build(),
+        )
+
+        // Short read timeout so the stalled socket read surfaces promptly
+        // after cancel; the production client keeps HttpClientFactory's 60s.
+        val stallingAdapter = OpenAiAdapter(
+            HttpClientFactory.create().newBuilder()
+                .readTimeout(1, TimeUnit.SECONDS)
                 .build(),
         )
 
         val emitted = mutableListOf<ChatEvent>()
         runBlocking {
             val job = launch {
-                adapter.streamChat(config(), "test-key-123", request()).collect { emitted += it }
+                stallingAdapter.streamChat(config(), "test-key-123", request())
+                    .collect { emitted += it }
             }
             delay(300)
             job.cancelAndJoin()
@@ -336,8 +347,8 @@ class OpenAiAdapterTest {
             (result as Result.Success).data.map { it.id },
         )
         val recorded = server.takeRequest(10, TimeUnit.SECONDS)!!
-        assertEquals("/v1/models", recorded.path)
-        assertEquals("Bearer test-key-123", recorded.getHeader("Authorization"))
+        assertEquals("/v1/models", recorded.target)
+        assertEquals("Bearer test-key-123", recorded.headers["Authorization"])
     }
 
     @Test
@@ -362,7 +373,7 @@ class OpenAiAdapterTest {
 
         assertTrue(result is Result.Success)
         val recorded = server.takeRequest(10, TimeUnit.SECONDS)!!
-        assertEquals("/v1/models", recorded.path)
+        assertEquals("/v1/models", recorded.target)
     }
 
     @Test

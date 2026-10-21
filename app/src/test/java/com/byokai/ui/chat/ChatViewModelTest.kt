@@ -13,6 +13,7 @@ import com.byokai.ui.providers.InMemoryConfigRepo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -58,7 +59,7 @@ class ChatViewModelTest {
     )
 
     /** ViewModel with one keyed config; settled past init. */
-    private suspend fun readyViewModel(
+    private suspend fun TestScope.readyViewModel(
         chatRepo: FakeChatRepository = FakeChatRepository(),
         withKey: Boolean = true,
     ): ChatViewModel {
