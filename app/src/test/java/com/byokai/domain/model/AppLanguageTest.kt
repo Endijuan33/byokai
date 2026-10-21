@@ -24,9 +24,11 @@ class AppLanguageTest {
     }
 
     @Test
-    fun `locale tags resolve to the expected locales`() {
+    fun `toLocale returns locales matching the resource qualifiers`() {
         assertEquals(Locale.ENGLISH, AppLanguage.ENGLISH.toLocale())
-        // BCP-47 "id" maps to Java's historic "in" for Indonesian.
+        // Explicit "in": matches the values-in qualifier on every runtime.
+        // (Locale.forLanguageTag("id") maps inconsistently across JVM/Android,
+        // so it is deliberately not used — see AppLanguage.toLocale.)
         assertEquals("in", AppLanguage.INDONESIAN.toLocale().language)
     }
 
