@@ -54,6 +54,23 @@ jobs:
       - name: Run Android lint
         run: gradle lintDebug --stacktrace
 
+      - name: Validate release build with R8 (dummy signing)
+        # Phase 6: R8 (minify + resource shrinking) is enabled for the
+        # release build type. The REAL release gate
+        # (.github/workflows/release.yml) still fails loudly until the
+        # release signing secrets are configured — that behavior is
+        # intentionally untouched. This step ONLY proves the full R8
+        # pipeline (ProGuard rules, resource shrinking) passes end to
+        # end, by signing with the committed DEBUG keystore (same
+        # credentials as the debug signingConfig in app/build.gradle.kts).
+        # The resulting APK is a CI validation artifact, never a release.
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ github.workspace }}/debug.keystore
+          ANDROID_KEYSTORE_PASSWORD: byokai-debug
+          ANDROID_KEY_ALIAS: byokai-debug
+          ANDROID_KEY_PASSWORD: byokai-debug
+        run: gradle assembleRelease --stacktrace
+
       - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v7.0.2
@@ -61,6 +78,14 @@ jobs:
           name: byokai-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
+      - name: Upload R8-validated release APK
+        if: success()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: byokai-release-r8-validation-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
 
       - name: Upload test and lint reports
         if: always()

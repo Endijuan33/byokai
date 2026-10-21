@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Network security configuration (Phase 6).
+
+    Defense in depth: cleartext traffic is already rejected above the
+    transport layer — EndpointValidator only accepts HTTP for loopback
+    hosts (with a warning) and the OkHttp client never follows redirects
+    (so an Authorization header can never leak to a redirect target).
+    This config hardens the platform default (cleartext is already
+    blocked by default on API 28+, BYOKAI's minSdk) so that no future
+    code path can silently open a cleartext connection.
+
+    Interaction with EndpointValidator: with cleartextTrafficPermitted
+    set to false here, the validator's loopback-HTTP carve-out is
+    unreachable on-device — the platform blocks it at the socket layer
+    before any warning could matter. That is the intended outcome: a
+    local dev server must be reached over TLS (or tested via the
+    validator's unit tests, which do not go through this config).
+
+    No certificate pinning, deliberately: BYOKAI is bring-your-own-key
+    with user-supplied custom endpoints (self-hosted gateways, proxies).
+    Pinning would break legitimate user endpoints and cannot cover
+    endpoints the app has never seen.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

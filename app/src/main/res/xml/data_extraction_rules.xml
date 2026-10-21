@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Data extraction rules for API 31+ (android:dataExtractionRules).
+    API 23-30 keeps using res/xml/backup_rules.xml
+    (android:fullBackupContent); keep the credential exclusions in both
+    files in sync.
+
+    Phase 6 backup policy:
+
+    - Cloud backup (Auto Backup -> Google Drive): excludes key material
+      AND the conversation database. Chats are not encrypted at rest (by
+      design) and users paste secrets into them, so they must never be
+      uploaded to Drive. Conversation portability stays available through
+      the explicit, user-initiated JSON export (Settings > Data
+      portability), which the user controls directly.
+    - Device-to-device transfer: excludes key material only. The transfer
+      is user-initiated over a direct connection, so conversations
+      migrate with the user; the Keystore-bound keyset could never be
+      decrypted on the new device, so it is left behind and the user
+      re-enters API keys there (surfaced as
+      CredentialException.KeyInvalidated).
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="datastore/byokai_credentials.preferences_pb"/>
+        <exclude domain="sharedpref" path="byokai_tink_keyset.xml"/>
+        <exclude domain="database" path="byokai.db"/>
+        <exclude domain="database" path="byokai.db-journal"/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore/byokai_credentials.preferences_pb"/>
+        <exclude domain="sharedpref" path="byokai_tink_keyset.xml"/>
+    </device-transfer>
+</data-extraction-rules>

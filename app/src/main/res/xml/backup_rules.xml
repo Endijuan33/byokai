@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <!--
+        Full-backup rules for API 23-30 (android:fullBackupContent).
+        API 31+ uses res/xml/data_extraction_rules.xml instead
+        (android:dataExtractionRules); keep the two files' credential
+        exclusions in sync.
+
         Phase 3 (Milestone 3B): API keys are encrypted at rest (Android
         Keystore master key + Tink AES-256-GCM data-encryption keyset).
 
@@ -19,7 +24,16 @@
         exist either; a freshly installed keyset encountering a
         permanently invalidated master key surfaces as
         CredentialException.KeyInvalidated and the user re-enters keys.
+
+        Phase 6: the conversation database is excluded as well. Message
+        text is not encrypted at rest (by design), and users paste
+        secrets into chats; Auto Backup uploads to Google Drive, so the
+        database must never ride along. Conversation portability stays
+        available through the explicit, user-initiated JSON export
+        (Settings > Data portability), which the user controls directly.
     -->
     <exclude domain="file" path="datastore/byokai_credentials.preferences_pb"/>
     <exclude domain="sharedpref" path="byokai_tink_keyset.xml"/>
+    <exclude domain="database" path="byokai.db"/>
+    <exclude domain="database" path="byokai.db-journal"/>
 </full-backup-content>
