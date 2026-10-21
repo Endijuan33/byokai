@@ -24,12 +24,17 @@ class AppLanguageTest {
     }
 
     @Test
-    fun `toLocale returns locales matching the resource qualifiers`() {
+    fun `toLocale returns BCP47-canonical locales`() {
         assertEquals(Locale.ENGLISH, AppLanguage.ENGLISH.toLocale())
-        // Explicit "in": matches the values-in qualifier on every runtime.
-        // (Locale.forLanguageTag("id") maps inconsistently across JVM/Android,
-        // so it is deliberately not used — see AppLanguage.toLocale.)
-        assertEquals("in", AppLanguage.INDONESIAN.toLocale().language)
+        assertEquals("en", AppLanguage.ENGLISH.toLocale().toLanguageTag())
+        // "id" is the canonical BCP-47 tag for Indonesian; toLanguageTag()
+        // is stable on every runtime, unlike getLanguage() which reports
+        // "id" on the JVM / Android 15+ and "in" on older Android (legacy
+        // ISO codes — see the Android Locale reference). The framework
+        // resolves the values-in qualifier for this language on all
+        // supported API levels; on-device verification is tracked in the
+        // Phase 5 device matrix.
+        assertEquals("id", AppLanguage.INDONESIAN.toLocale().toLanguageTag())
     }
 
     @Test
