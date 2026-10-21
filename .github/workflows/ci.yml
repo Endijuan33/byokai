@@ -9,6 +9,9 @@ name: CI
 on:
   push:
     branches: [main]
+  # Manual trigger: used when the push-event pipeline is degraded and for
+  # ad-hoc re-validation. Same job, same gates as a push run.
+  workflow_dispatch:
 
 concurrency:
   group: ci-main
