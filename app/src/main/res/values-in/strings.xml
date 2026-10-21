@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BYOKAI</string>
+
+    <!-- Home (conversation list) -->
+    <string name="home_title">Percakapan</string>
+    <string name="home_empty_title">Belum ada percakapan</string>
+    <string name="home_empty_body">Chat dengan API key milikmu hadir di Fase 3 — pengaturan provider, streaming, dan riwayat.</string>
+
+    <!-- Common actions -->
+    <string name="action_settings">Pengaturan</string>
+    <string name="action_back">Kembali</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Pengaturan</string>
+    <string name="settings_section_appearance">Tampilan</string>
+    <string name="theme_mode_system">Mengikuti sistem</string>
+    <string name="theme_mode_light">Terang</string>
+    <string name="theme_mode_dark">Gelap</string>
+    <string name="settings_dynamic_color">Warna dinamis</string>
+    <string name="settings_dynamic_color_summary">Gunakan warna wallpaper di Android 12 ke atas</string>
+    <string name="settings_section_language">Bahasa</string>
+    <string name="language_english">English</string>
+    <string name="language_indonesian">Indonesia</string>
+    <string name="settings_section_about">Tentang</string>
+    <string name="settings_version">Versi</string>
+    <string name="settings_application_id">ID Aplikasi</string>
+    <string name="settings_save_error">Gagal menyimpan pengaturan. Coba lagi.</string>
+</resources>

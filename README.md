@@ -6,10 +6,26 @@ BYOKAI is a native Android application (Kotlin, Jetpack Compose, Material 3) tha
 combines a modern conversational experience with multi-provider model management:
 you supply your own API keys, and BYOKAI talks to the providers you configure.
 
-> **Project status: Phase 1 — repository & CI foundation.**
-> The app currently builds, passes unit tests and lint, and ships a debug APK
-> from CI. Chat, provider adapters, and AI features are **not implemented yet** —
+> **Project status: Phase 2 — application foundation.**
+> The app builds, passes unit tests and lint, and ships a debug APK from CI.
+> Navigation, settings, and persistence foundations are implemented (below).
+> Chat, provider adapters, and AI features are **not implemented yet** —
 > see [docs/ROADMAP.md](docs/ROADMAP.md) for the honest status of every phase.
+
+## Implemented features (Phase 2)
+
+- App shell with Compose Navigation: conversation list (`home`) + settings
+- Fully functional Settings screen backed by DataStore Preferences:
+  - Theme mode: System / Light / Dark (applies immediately)
+  - Dynamic Color toggle (applies immediately)
+  - Language: English / Indonesia (persists; applies on activity recreate)
+  - About section with the real `BuildConfig` version and application ID
+- Layered architecture: `domain` (models, repository interfaces), `data`
+  (DataStore, repository implementations), `core` (Result/UiText, locale
+  helper), manual DI via `AppContainer` (interim until Hilt returns)
+- Error handling: repository `Result`s surface as Snackbar messages;
+  ViewModels never hold a Context
+- Full English/Indonesian localization; no hardcoded UI strings
 
 ## Highlights (target vision)
 
@@ -61,7 +77,11 @@ The debug APK is produced at `app/build/outputs/apk/debug/app-debug.apk`.
 │   └── src/main/java/com/byokai/
 │       ├── ByokaiApplication.kt
 │       ├── MainActivity.kt
-│       ├── ui/                 # Compose UI: theme, navigation, screens
+│       ├── core/               # common (Result, UiText), ui (LocaleHelper)
+│       ├── data/               # local/datastore, repository implementations
+│       ├── di/                 # AppContainer (manual DI, interim)
+│       ├── domain/             # model (enums), repository interfaces
+│       ├── ui/                 # theme, navigation, home, settings screens
 │       └── util/               # Pure Kotlin helpers (unit-tested)
 ├── gradle/libs.versions.toml   # Version catalog (all versions verified)
 ├── .github/workflows/          # CI: pr-validation, ci, release

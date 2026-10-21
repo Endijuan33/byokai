@@ -3,7 +3,7 @@
 Phase plan with honest statuses. A phase is *done* only when its acceptance
 criteria are met **and** validated by CI — never on code existing alone.
 
-## Phase 1 — Repository and CI foundation — IN PROGRESS
+## Phase 1 — Repository and CI foundation — COMPLETED (2026-10-21)
 
 Acceptance:
 
@@ -13,15 +13,28 @@ Acceptance:
 - [x] Real unit test that passes in CI.
 - [x] Workflows: PR validation, main CI (debug APK artifact), manual release.
 - [x] Baseline docs set.
-- [ ] CI green on the initial commit (pending at time of writing).
-- [ ] Branch protection enabled on `main`.
+- [x] CI green (run 39615455479, `completed/success`, verified via API).
+- [x] Branch protection enabled on `main` (PR + required checks + review).
 
-## Phase 2 — Application foundation — NOT STARTED
+## Phase 2 — Application foundation — COMPLETED (2026-10-21)
 
-UI shell and navigation, Material 3 theme polish, local database schema
-design, app settings, domain models + repository layer, error handling and
-state management. Acceptance: navigable app shell with settings persistence,
-instrumented test harness running in CI.
+Acceptance:
+
+- [x] Navigable app shell: `home` + `settings` destinations in the NavHost.
+- [x] Fully functional Settings screen (theme mode, Dynamic Color,
+      language, About) backed by DataStore Preferences.
+- [x] Domain/data layering: `domain.model`, `domain.repository`,
+      `data.local.datastore`, `data.repository`, `core.common`, `core.ui`.
+- [x] Manual DI via `di.AppContainer` (interim until Hilt/KSP).
+- [x] Error handling: `Result`/`UiText`; real IO failures reach a Snackbar.
+- [x] Full en/id localization; no hardcoded UI strings.
+- [x] Real unit tests green in CI (enum round-trips, ViewModel + fake,
+      DataStore integration); Phase 1 tests still green.
+- [x] `versionCode` 2 / `versionName` 0.2.0; CHANGELOG + docs updated.
+- [x] CI green on the Phase 2 commit.
+
+Note: the local database schema (Room) stays deferred with Phase 3 — KSP
+still has no Kotlin 2.4.x release, so conversation persistence waits.
 
 ## Phase 3 — BYOK core — NOT STARTED
 
@@ -86,4 +99,6 @@ quality/security audits.
 | okhttp | 5.5.0 | repo1.maven.org maven-metadata |
 | tink-android | 1.24.0 | repo1.maven.org maven-metadata |
 | datastore-preferences | 1.2.1 | dl.google.com maven-metadata |
+| kotlinx-coroutines (core/android/test) | 1.11.0 | repo1.maven.org maven-metadata |
+| compose material-icons-core | BOM-managed | Compose BOM 2026.09.00 |
 | junit | 4.13.2 | repo1.maven.org maven-metadata |

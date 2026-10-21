@@ -1,22 +1,36 @@
 # Architecture
 
-## Status: Phase 1 — foundation only
+## Status: Phase 2 — application foundation
 
 This document describes the architecture **as implemented today** plus the
 planned module boundaries for later phases. Anything marked "planned" does
 not exist yet — see [ROADMAP.md](ROADMAP.md) for the honest phase statuses.
 
-## Implemented (Phase 1)
+## Implemented (Phase 2)
 
 Single-module Android app (`:app`, namespace `com.byokai`):
 
 ```
 com.byokai/
-├── ByokaiApplication.kt        # Application subclass (minimal for now)
-├── MainActivity.kt             # Single activity, edge-to-edge Compose host
+├── ByokaiApplication.kt        # Owns the AppContainer (manual DI graph)
+├── MainActivity.kt             # Single activity; locale wrap in
+│                             # attachBaseContext, reactive theme in setContent
+├── core/
+│   ├── common/                 # Result<T>, UiText (pure Kotlin + Context-free)
+│   └── ui/                     # LocaleHelper (context locale wrapping)
+├── data/
+│   ├── local/datastore/        # SettingsDataStore + process-wide holder
+│   └── repository/             # SettingsRepositoryImpl
+├── di/
+│   └── AppContainer.kt         # Manual DI: lazy singletons (interim)
+├── domain/
+│   ├── model/                  # ThemeMode, AppLanguage (pure enums)
+│   └── repository/             # SettingsRepository interface
 ├── ui/
-│   ├── ByokaiApp.kt            # Root NavHost (one route: "home")
-│   ├── home/HomeScreen.kt      # Honest Phase-1 placeholder screen
+│   ├── ByokaiApp.kt            # Root NavHost (routes: "home", "settings")
+│   ├── home/HomeScreen.kt      # Conversation list + honest empty state
+│   ├── settings/               # SettingsScreen, SettingsViewModel (+factory),
+│   │                         # SettingsUiState
 │   └── theme/                  # Material 3 theme: Color, Theme, Type
 └── util/
     └── VersionInfo.kt          # Pure Kotlin version-name helpers (unit-tested)
@@ -25,11 +39,38 @@ com.byokai/
 Design decisions:
 
 - **Single activity + Compose Navigation.** No fragments, no XML layouts.
+  Phase 2 graph: `home` → `settings`.
 - **Material 3 + Dynamic Color.** `ByokaiTheme` uses dynamic color schemes on
-  Android 12+ and static light/dark seeds below that.
+  Android 12+ and static light/dark seeds below that. The theme mode and
+  dynamic-color toggle are reactive: `MainActivity` collects the settings
+  Flows with `collectAsStateWithLifecycle`, so changes apply instantly.
+- **Settings persistence via DataStore Preferences.** `SettingsDataStore`
+  is a thin wrapper: reads recover from `IOException` with documented
+  defaults; writes return `Result<Unit>` so failures reach the UI.
+  `SettingsDataStoreHolder` keeps one process-wide instance because
+  DataStore forbids two active instances on the same file.
+- **Per-app language without restart UX friction.** The persisted language
+  is read in `MainActivity.attachBaseContext` and applied by wrapping the
+  base context (`LocaleHelper`). Tradeoff, documented deliberately:
+  DataStore is async by design, so this read is synchronous via
+  `runBlocking` with a 2-second `withTimeoutOrNull` and an English
+  fallback. The timeout bounds any ANR risk; in practice the read is
+  milliseconds. Changing language in Settings writes the preference, then
+  recreates the activity so the new locale takes effect.
+- **Manual DI (`di.AppContainer`).** Hilt is deferred until KSP supports
+  Kotlin 2.4.x (see below). The container exposes repository interfaces as
+  lazy singletons; screens resolve it via the Application. When Hilt
+  returns, `AppContainer` is replaced by Hilt modules without changing
+  repository interfaces or call sites.
+- **Error handling.** Repositories return `Result`; ViewModels translate
+  failures to `UiText` on an error channel; screens show a Snackbar.
+  ViewModels never hold a `Context`.
+- **Localization.** All UI strings live in `values/strings.xml` (English,
+  default) and `values-in/strings.xml` (Indonesian). No hardcoded text in
+  Composables.
 - **minSdk 28 / targetSdk 37.** New APIs are used conditionally with
   `Build.VERSION.SDK_INT` guards; `enableEdgeToEdge()` handles insets.
-- **No permissions in Phase 1.** The manifest declares none because the app
+- **No permissions in Phase 2.** The manifest declares none because the app
   does no I/O beyond its own process yet. Every future permission must be
   justified in its pull request and recorded here.
 - **Release signing is environment-driven** (`ANDROID_KEYSTORE_*` variables);
@@ -60,6 +101,6 @@ Rules that already apply:
   Kotlin 2.4.x (latest KSP is 2.3.12). Manual constructor injection is used
   until Hilt returns in a later phase.
 - **Local database:** Room is deferred for the same KSP reason; the
-  conversation-history schema lands with Phase 2/3.
+  conversation-history schema lands with Phase 3.
 - **Minification:** R8 is off until Phase 5, when ProGuard rules are reviewed
   rule-by-rule.

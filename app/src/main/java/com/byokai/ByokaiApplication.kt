@@ -1,11 +1,21 @@
 package com.byokai
 
 import android.app.Application
+import com.byokai.di.AppContainer
 
 /**
  * Application entry point for BYOKAI.
  *
- * Phase 1: intentionally minimal. Dependency injection, logging, and crash
- * reporting are introduced in later phases (see docs/ROADMAP.md).
+ * Owns the [AppContainer] dependency graph (manual DI until Hilt returns —
+ * see docs/ARCHITECTURE.md).
  */
-class ByokaiApplication : Application()
+class ByokaiApplication : Application() {
+
+    lateinit var appContainer: AppContainer
+        private set
+
+    override fun onCreate() {
+        super.onCreate()
+        appContainer = AppContainer(this)
+    }
+}

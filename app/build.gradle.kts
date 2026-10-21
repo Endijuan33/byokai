@@ -15,9 +15,9 @@ android {
         applicationId = "com.byokai"
         minSdk = 28
         targetSdk = 37
-        versionCode = 1
+        versionCode = 2
         // Overridable from the release workflow via -Pbyokai.versionName=<x.y.z>.
-        versionName = (findProperty("byokai.versionName") as String?) ?: "0.1.0"
+        versionName = (findProperty("byokai.versionName") as String?) ?: "0.2.0"
     }
 
     signingConfigs {
@@ -70,6 +70,9 @@ android {
     }
     buildFeatures {
         compose = true
+        // Explicit: the Settings About section reads BuildConfig.VERSION_NAME
+        // and BuildConfig.APPLICATION_ID.
+        buildConfig = true
     }
     lint {
         // Fail the build on lint errors; warnings stay informational in Phase 1.
@@ -95,6 +98,11 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons.core)
+    implementation(libs.datastore.preferences)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

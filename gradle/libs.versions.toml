@@ -25,6 +25,11 @@ serializationJson = "1.12.0"
 okhttp = "5.5.0"
 tinkAndroid = "1.24.0"
 datastorePreferences = "1.2.1"
+# kotlinx.coroutines 1.11.0 verified on repo1.maven.org 2026-10-21 (stable).
+# Pinned explicitly so the version is deterministic instead of floating on
+# whatever lifecycle/datastore/navigation pull transitively. The -test
+# artifact is needed for ViewModel unit tests (TestDispatcher + runTest).
+coroutines = "1.11.0"
 junit = "4.13.2"
 
 [libraries]
@@ -42,6 +47,11 @@ serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serializ
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 tink-android = { group = "com.google.crypto.tink", name = "tink-android", version.ref = "tinkAndroid" }
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
+# BOM-managed: no version.ref, the Compose BOM supplies a tested version.
+compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

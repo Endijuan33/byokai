@@ -5,6 +5,50 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-10-21
+
+Phase 2: application foundation.
+
+### Added
+
+- Navigation graph with `home` (conversation list with an honest empty
+  state — no fake items, no dead buttons) and `settings` destinations;
+  settings is reachable from the home TopAppBar.
+- Fully functional Settings screen backed by DataStore Preferences: theme
+  mode (System/Light/Dark, applies immediately), Dynamic Color toggle
+  (applies immediately), language (English/Indonesia, persists; the
+  activity recreates so the new locale takes effect), and an About section
+  showing the real `BuildConfig.VERSION_NAME` and
+  `BuildConfig.APPLICATION_ID`.
+- Per-app language applied via `MainActivity.attachBaseContext` locale
+  wrapping. The DataStore read there is synchronous by necessity with a
+  2-second timeout and a default fallback — tradeoff documented in
+  docs/ARCHITECTURE.md.
+- Layered architecture: `domain.model` (`ThemeMode`, `AppLanguage` enums
+  with storage-key mapping), `domain.repository.SettingsRepository`
+  interface, `data.local.datastore.SettingsDataStore` (+ process-wide
+  holder shared with the startup locale path),
+  `data.repository.SettingsRepositoryImpl`, `core.common` (`Result`,
+  `UiText` for error handling without holding a Context).
+- Manual DI via `di.AppContainer` (lazy singletons) as interim until Hilt
+  returns with KSP for Kotlin 2.4.x.
+- `SettingsViewModel` (`StateFlow<SettingsUiState>` + error `Channel`
+  surfaced to a Snackbar; real DataStore IO failures reach the user).
+- Full localization: `values/strings.xml` (English, default) and
+  `values-in/strings.xml` (Indonesian); no hardcoded UI text.
+- New unit tests: enum storage-key round-trips (`ThemeModeTest`,
+  `AppLanguageTest`), `SettingsViewModel` with a fake repository (state
+  updates + error forwarding), and DataStore integration tests against a
+  real preferences file (`SettingsDataStoreTest`). `VersionInfoTest`
+  (Phase 1) still green.
+- Dependencies (all stable, verified 2026-10-21): kotlinx-coroutines
+  1.11.0 (core/android/test, repo1.maven.org), Compose Material
+  icons-core (BOM-managed), DataStore Preferences 1.2.1 now wired in.
+
+### Changed
+
+- `versionCode` 2, `versionName` 0.2.0.
+
 ## [0.1.0] — 2026-10-21
 
 Phase 1: repository and CI foundation.
@@ -36,5 +80,6 @@ Phase 1: repository and CI foundation.
   toolchain. See docs/ROADMAP.md.
 - R8/minification is deferred to Phase 5.
 
-[Unreleased]: https://github.com/Endijuan33/byokai/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Endijuan33/byokai/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Endijuan33/byokai/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Endijuan33/byokai/releases/tag/v0.1.0

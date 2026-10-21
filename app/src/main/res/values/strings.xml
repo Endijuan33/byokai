@@ -1,7 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">BYOKAI</string>
-    <!-- Shown on the Phase 1 placeholder home screen. Must stay honest: no
-         chat or provider features exist yet. -->
-    <string name="phase1_status">Phase 1 — CI foundation. Chat and provider features are not implemented yet.</string>
+
+    <!-- Home (conversation list) -->
+    <string name="home_title">Conversations</string>
+    <string name="home_empty_title">No conversations yet</string>
+    <string name="home_empty_body">Chat with your own API keys arrives in Phase 3 — provider setup, streaming, and history.</string>
+
+    <!-- Common actions -->
+    <string name="action_settings">Settings</string>
+    <string name="action_back">Back</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="theme_mode_system">System default</string>
+    <string name="theme_mode_light">Light</string>
+    <string name="theme_mode_dark">Dark</string>
+    <string name="settings_dynamic_color">Dynamic color</string>
+    <string name="settings_dynamic_color_summary">Use wallpaper colors on Android 12 and above</string>
+    <string name="settings_section_language">Language</string>
+    <string name="language_english">English</string>
+    <string name="language_indonesian">Indonesia</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_application_id">Application ID</string>
+    <string name="settings_save_error">Couldn\'t save setting. Please try again.</string>
 </resources>
