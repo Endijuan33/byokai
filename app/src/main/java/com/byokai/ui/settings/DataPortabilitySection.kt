@@ -50,6 +50,15 @@ fun DataPortabilitySection(
     val scope = rememberCoroutineScope()
     var pendingImportConfirm by remember { mutableStateOf(false) }
 
+    // Resolved at composition (configuration-aware): the SAF callbacks
+    // below are not composable scopes, so they cannot call
+    // stringResource directly.
+    val exportDoneText = stringResource(R.string.settings_export_done)
+    val exportErrorText = stringResource(R.string.settings_export_error)
+    val importDoneTemplate = stringResource(R.string.settings_import_done)
+    val importReadErrorText = stringResource(R.string.settings_import_read_error)
+    val importInvalidTemplate = stringResource(R.string.settings_import_invalid)
+
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri: Uri? ->
@@ -65,15 +74,9 @@ fun DataPortabilitySection(
                             } ?: throw IllegalStateException("null stream")
                         }.isSuccess
                     }
-                    onMessage(
-                        context.getString(
-                            if (ok) R.string.settings_export_done
-                            else R.string.settings_export_error,
-                        ),
-                    )
+                    onMessage(if (ok) exportDoneText else exportErrorText)
                 }
-                is Result.Error ->
-                    onMessage(context.getString(R.string.settings_export_error))
+                is Result.Error -> onMessage(exportErrorText)
                 is Result.Loading -> Unit
             }
         }
@@ -106,7 +109,7 @@ fun DataPortabilitySection(
                 }.getOrNull()
             }
             if (bytes == null) {
-                onMessage(context.getString(R.string.settings_import_read_error))
+                onMessage(importReadErrorText)
                 return@launch
             }
             // Never log conversation content on failure — only the
@@ -115,20 +118,14 @@ fun DataPortabilitySection(
                 is Result.Success -> {
                     val summary = result.data
                     onMessage(
-                        context.getString(
-                            R.string.settings_import_done,
+                        importDoneTemplate.format(
                             summary.importedConversations,
                             summary.importedMessages,
                         ),
                     )
                 }
                 is Result.Error ->
-                    onMessage(
-                        context.getString(
-                            R.string.settings_import_invalid,
-                            result.cause.message.orEmpty(),
-                        ),
-                    )
+                    onMessage(importInvalidTemplate.format(result.cause.message.orEmpty()))
                 is Result.Loading -> Unit
             }
         }
