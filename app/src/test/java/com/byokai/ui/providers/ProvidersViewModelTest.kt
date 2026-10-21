@@ -281,4 +281,84 @@ class ProvidersViewModelTest {
 
         assertEquals("m-1", repo.get("cfg-1")!!.defaultModelId)
     }
+
+    private fun twoFamilyViewModel(): Triple<ProvidersViewModel, FakeAdapter, FakeAdapter> {
+        val openai = FakeAdapter(
+            providerId = ProviderId.OPENAI,
+            displayName = "FakeOpenAI",
+            defaultBaseUrl = "https://openai.example.com",
+        )
+        val anthropic = FakeAdapter(
+            providerId = ProviderId.ANTHROPIC,
+            displayName = "FakeAnthropic",
+            defaultBaseUrl = "https://anthropic.example.com",
+        )
+        val registry = ProviderRegistry().apply {
+            register(openai)
+            register(anthropic)
+        }
+        val vm = ProvidersViewModel(InMemoryConfigRepo(), FakeCredentialStore(), registry)
+        return Triple(vm, openai, anthropic)
+    }
+
+    @Test
+    fun `selectProviderFamily replaces pristine base URL with new family default`() =
+        runTest(testDispatcher) {
+            val (vm, _, anthropic) = twoFamilyViewModel()
+            advanceUntilIdle()
+
+            vm.addNew() // pristine draft: baseUrl = openai default
+            vm.selectProviderFamily(anthropic)
+
+            val draft = vm.uiState.value.editing
+            assertNotNull(draft)
+            assertEquals(ProviderId.ANTHROPIC, draft!!.providerId)
+            assertEquals("https://anthropic.example.com", draft.baseUrl)
+        }
+
+    @Test
+    fun `selectProviderFamily preserves a hand-typed base URL`() =
+        runTest(testDispatcher) {
+            val (vm, _, anthropic) = twoFamilyViewModel()
+            advanceUntilIdle()
+
+            vm.addNew()
+            val typed = vm.uiState.value.editing!!.copy(baseUrl = "https://proxy.example.com/v1")
+            vm.updateDraft(typed)
+            vm.selectProviderFamily(anthropic)
+
+            val draft = vm.uiState.value.editing
+            assertNotNull(draft)
+            assertEquals(ProviderId.ANTHROPIC, draft!!.providerId)
+            assertEquals("https://proxy.example.com/v1", draft.baseUrl)
+        }
+
+    @Test
+    fun `selectProviderFamily fills a blank base URL with new family default`() =
+        runTest(testDispatcher) {
+            val (vm, _, anthropic) = twoFamilyViewModel()
+            advanceUntilIdle()
+
+            vm.addNew()
+            val blanked = vm.uiState.value.editing!!.copy(baseUrl = "   ")
+            vm.updateDraft(blanked)
+            vm.selectProviderFamily(anthropic)
+
+            val draft = vm.uiState.value.editing
+            assertNotNull(draft)
+            assertEquals("https://anthropic.example.com", draft!!.baseUrl)
+        }
+
+    @Test
+    fun `selectProviderFamily is a no-op for the same family`() =
+        runTest(testDispatcher) {
+            val (vm, openai, _) = twoFamilyViewModel()
+            advanceUntilIdle()
+
+            vm.addNew()
+            val before = vm.uiState.value.editing!!
+            vm.selectProviderFamily(openai)
+
+            assertEquals(before, vm.uiState.value.editing)
+        }
 }

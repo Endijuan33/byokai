@@ -198,6 +198,7 @@ fun ProvidersScreen(onBackClick: () -> Unit) {
             adapters = uiState.providers,
             testState = uiState.testResult[editing.id] ?: TestState.Idle,
             onDraftChange = viewModel::updateDraft,
+            onProviderFamilySelected = viewModel::selectProviderFamily,
             onDismiss = viewModel::cancelEdit,
             onSave = { draft, apiKey -> viewModel.saveDraft(draft, apiKey) },
             onTest = { draft, apiKey -> viewModel.testDraft(draft, apiKey) },
@@ -343,6 +344,7 @@ private fun ProviderEditorSheet(
     adapters: List<AiProvider>,
     testState: TestState,
     onDraftChange: (ProviderConfigDraft) -> Unit,
+    onProviderFamilySelected: (AiProvider) -> Unit,
     onDismiss: () -> Unit,
     onSave: (ProviderConfigDraft, String) -> Unit,
     onTest: (ProviderConfigDraft, String) -> Unit,
@@ -382,14 +384,7 @@ private fun ProviderEditorSheet(
             ProviderFamilyDropdown(
                 adapters = adapters,
                 selected = adapter,
-                onSelect = { selected ->
-                    onDraftChange(
-                        draft.copy(
-                            providerId = selected.providerId,
-                            baseUrl = draft.baseUrl.ifBlank { selected.defaultBaseUrl },
-                        ),
-                    )
-                },
+                onSelect = onProviderFamilySelected,
             )
 
             OutlinedTextField(

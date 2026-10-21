@@ -183,6 +183,28 @@ class ProvidersViewModel(
         _uiState.update { it.copy(editing = draft) }
     }
 
+    /**
+     * Switches the open draft to [adapter]'s provider family.
+     *
+     * The base URL follows the new family's default UNLESS the user
+     * customized it: a blank field, or one still holding the previous
+     * family's default, is replaced with the new default; a hand-typed
+     * URL is left alone so a custom proxy or OpenAI-compatible endpoint
+     * is never clobbered by accident.
+     */
+    fun selectProviderFamily(adapter: AiProvider) {
+        _uiState.update { state ->
+            val draft = state.editing ?: return@update state
+            if (draft.providerId == adapter.providerId) return@update state
+            val previousDefault = providerRegistry.get(draft.providerId)?.defaultBaseUrl?.trim()
+            val current = draft.baseUrl.trim()
+            val newBaseUrl =
+                if (current.isBlank() || current == previousDefault) adapter.defaultBaseUrl
+                else draft.baseUrl
+            state.copy(editing = draft.copy(providerId = adapter.providerId, baseUrl = newBaseUrl))
+        }
+    }
+
     /** Closes the editor, discarding unsaved changes. */
     fun cancelEdit() {
         _uiState.update { it.copy(editing = null) }
