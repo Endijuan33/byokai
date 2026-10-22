@@ -147,6 +147,9 @@ class OpenAiCompatibleAdapterTest {
         assertTrue(error is ProviderError.InvalidModel)
         assertEquals("custom-model-a", (error as ProviderError.InvalidModel).modelId)
     }
+
+    @Test
+    fun `listModels returns server models on success`() = runBlocking {
         server.enqueue(
             MockResponse.Builder()
                 .code(200)
