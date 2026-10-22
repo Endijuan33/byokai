@@ -1,10 +1,13 @@
 package com.byokai.data.repository
 
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import com.byokai.core.common.Result
 import com.byokai.domain.model.ChatRole
 import com.byokai.domain.model.Conversation
+import com.byokai.domain.model.ImageAttachment
 import com.byokai.domain.model.Message
+import com.byokai.domain.repository.AttachmentStorage
 import com.byokai.domain.repository.ConversationRepository
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +37,13 @@ import kotlinx.coroutines.withContext
  * message row whose `role` no longer maps to [ChatRole] is skipped
  * rather than crashing the query.
  *
+ * Phase 9B: attachment metadata rows ride along in the same
+ * transaction ([appendMessage]). Attachment FILES are deleted
+ * best-effort (never transactionally) when their rows go away —
+ * via [delete] and [deleteMessagesFrom] — using [attachmentStorage].
+ * A leftover file is harmless: private dir, UUID names, never served
+ * without its metadata row.
+ *
  * This class is Android-only: [SupportSQLiteOpenHelper] cannot be
  * instantiated on the JVM, so there are no JVM unit tests for this
  * file — ViewModel tests use an in-memory fake of
@@ -42,6 +52,7 @@ import kotlinx.coroutines.withContext
  */
 class SqliteConversationRepository(
     private val helper: SupportSQLiteOpenHelper,
+    private val attachmentStorage: AttachmentStorage,
 ) : ConversationRepository {
 
     private val refresh = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -78,13 +89,41 @@ class SqliteConversationRepository(
         conversation
     }
 
-    override suspend fun delete(id: String): Result<Unit> = ioWrite {
-        // Messages go with it via ON DELETE CASCADE (foreign keys are
-        // enabled in ByokaiDatabase.onConfigure).
-        helper.writableDatabase.execSQL(
-            "DELETE FROM conversations WHERE id = ?",
-            arrayOf<Any?>(id),
-        )
+    override suspend fun delete(id: String): Result<Unit> {
+        // Attachment rows go with the messages via ON DELETE CASCADE;
+        // their FILES are deleted best-effort afterwards (files are not
+        // transactional). Collected before the delete, inside ioWrite so
+        // the read sees a consistent snapshot.
+        val doomed = ioWrite {
+            val fileNames = helper.readableDatabase.query(
+                "SELECT a.file_name FROM attachments a " +
+                    "JOIN messages m ON m.id = a.message_id " +
+                    "WHERE m.conversation_id = ?",
+                arrayOf<Any?>(id),
+            ).use { cursor ->
+                val idx = cursor.getColumnIndexOrThrow("file_name")
+                buildList {
+                    while (cursor.moveToNext()) add(cursor.getString(idx))
+                }
+            }
+            // Messages go with it via ON DELETE CASCADE (foreign keys are
+            // enabled in ByokaiDatabase.onConfigure).
+            helper.writableDatabase.execSQL(
+                "DELETE FROM conversations WHERE id = ?",
+                arrayOf<Any?>(id),
+            )
+            fileNames
+        }
+        return when (doomed) {
+            is Result.Success -> {
+                doomed.data.forEach {
+                    runCatching { attachmentStorage.delete(it) }
+                }
+                Result.Success(Unit)
+            }
+            is Result.Error -> doomed
+            is Result.Loading -> doomed
+        }
     }
 
     override suspend fun rename(id: String, title: String): Result<Unit> = ioWrite {
@@ -116,29 +155,46 @@ class SqliteConversationRepository(
     override suspend fun deleteMessagesFrom(
         conversationId: String,
         messageId: String,
-    ): Result<Unit> = ioWrite {
-        val db = helper.writableDatabase
-        db.beginTransaction()
-        try {
-            // rowid >= the target's rowid deletes the target row and
-            // every row inserted after it (insertion order is the turn
-            // order). rowid is monotonic per insert, so unlike
-            // created_at it cannot collide when two appends land in the
-            // same millisecond. When messageId does not exist the
-            // subquery yields NULL, `>= NULL` is never true, and nothing
-            // is deleted.
-            db.execSQL(
-                "DELETE FROM messages WHERE conversation_id = ? AND rowid >= " +
-                    "(SELECT rowid FROM messages WHERE id = ? AND conversation_id = ?)",
-                arrayOf<Any?>(conversationId, messageId, conversationId),
-            )
-            db.execSQL(
-                "UPDATE conversations SET updated_at = ? WHERE id = ?",
-                arrayOf<Any?>(System.currentTimeMillis(), conversationId),
-            )
-            db.setTransactionSuccessful()
-        } finally {
-            db.endTransaction()
+    ): Result<Unit> {
+        // Attachment rows in the doomed range go away via ON DELETE
+        // CASCADE; their FILES are collected first and deleted
+        // best-effort afterwards (files are not transactional).
+        val doomed = ioWrite {
+            val db = helper.writableDatabase
+            val fileNames = attachmentFileNamesInRange(db, conversationId, messageId)
+            db.beginTransaction()
+            try {
+                // rowid >= the target's rowid deletes the target row and
+                // every row inserted after it (insertion order is the turn
+                // order). rowid is monotonic per insert, so unlike
+                // created_at it cannot collide when two appends land in the
+                // same millisecond. When messageId does not exist the
+                // subquery yields NULL, `>= NULL` is never true, and nothing
+                // is deleted.
+                db.execSQL(
+                    "DELETE FROM messages WHERE conversation_id = ? AND rowid >= " +
+                        "(SELECT rowid FROM messages WHERE id = ? AND conversation_id = ?)",
+                    arrayOf<Any?>(conversationId, messageId, conversationId),
+                )
+                db.execSQL(
+                    "UPDATE conversations SET updated_at = ? WHERE id = ?",
+                    arrayOf<Any?>(System.currentTimeMillis(), conversationId),
+                )
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+            fileNames
+        }
+        return when (doomed) {
+            is Result.Success -> {
+                doomed.data.forEach {
+                    runCatching { attachmentStorage.delete(it) }
+                }
+                Result.Success(Unit)
+            }
+            is Result.Error -> doomed
+            is Result.Loading -> doomed
         }
     }
 
@@ -147,6 +203,7 @@ class SqliteConversationRepository(
         role: ChatRole,
         content: String,
         isPartial: Boolean,
+        attachments: List<ImageAttachment>,
     ): Result<Message> = ioWrite {
         val db = helper.writableDatabase
         val now = System.currentTimeMillis()
@@ -157,6 +214,7 @@ class SqliteConversationRepository(
             content = content,
             createdAt = now,
             isPartial = isPartial,
+            attachments = attachments,
         )
         db.beginTransaction()
         try {
@@ -172,6 +230,23 @@ class SqliteConversationRepository(
                     if (isPartial) 1 else 0,
                 ),
             )
+            // Attachment files already exist in AttachmentStorage
+            // (written at pick time); only metadata rows are inserted,
+            // atomically with the message.
+            for (attachment in attachments) {
+                db.execSQL(
+                    "INSERT INTO attachments (id, message_id, file_name, mime_type, width, height) " +
+                        "VALUES (?, ?, ?, ?, ?, ?)",
+                    arrayOf<Any?>(
+                        attachment.id,
+                        message.id,
+                        attachment.fileName,
+                        attachment.mimeType,
+                        attachment.width,
+                        attachment.height,
+                    ),
+                )
+            }
             db.execSQL(
                 "UPDATE conversations SET updated_at = ? WHERE id = ?",
                 arrayOf<Any?>(now, conversationId),
@@ -283,8 +358,9 @@ class SqliteConversationRepository(
         return if (cursor.isNull(idx)) null else cursor.getString(idx)
     }
 
-    private fun queryMessages(conversationId: String): List<Message> =
-        helper.readableDatabase.query(
+    private fun queryMessages(conversationId: String): List<Message> {
+        val db = helper.readableDatabase
+        val messages = db.query(
             "SELECT id, conversation_id, role, content, created_at, is_partial " +
                 "FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
             arrayOf<Any?>(conversationId),
@@ -311,6 +387,73 @@ class SqliteConversationRepository(
                         ),
                     )
                 }
+            }
+        }
+        if (messages.isEmpty()) return messages
+        val attachmentsByMessage = queryAttachments(db, messages.map { it.id })
+        return messages.map { message ->
+            message.copy(attachments = attachmentsByMessage[message.id].orEmpty())
+        }
+    }
+
+    /**
+     * Batch-loads attachment metadata for [messageIds] in one query per
+     * 500-id chunk (SQLite bind-variable cap), keyed by message id.
+     */
+    private fun queryAttachments(
+        db: SupportSQLiteDatabase,
+        messageIds: List<String>,
+    ): Map<String, List<ImageAttachment>> {
+        val out = mutableMapOf<String, MutableList<ImageAttachment>>()
+        for (chunk in messageIds.chunked(500)) {
+            val placeholders = chunk.joinToString(",") { "?" }
+            db.query(
+                "SELECT id, message_id, file_name, mime_type, width, height " +
+                    "FROM attachments WHERE message_id IN ($placeholders)",
+                chunk.toTypedArray(),
+            ).use { cursor ->
+                val idIdx = cursor.getColumnIndexOrThrow("id")
+                val msgIdx = cursor.getColumnIndexOrThrow("message_id")
+                val fileIdx = cursor.getColumnIndexOrThrow("file_name")
+                val mimeIdx = cursor.getColumnIndexOrThrow("mime_type")
+                val wIdx = cursor.getColumnIndexOrThrow("width")
+                val hIdx = cursor.getColumnIndexOrThrow("height")
+                while (cursor.moveToNext()) {
+                    val attachment = ImageAttachment(
+                        id = cursor.getString(idIdx),
+                        fileName = cursor.getString(fileIdx),
+                        mimeType = cursor.getString(mimeIdx),
+                        width = cursor.getInt(wIdx),
+                        height = cursor.getInt(hIdx),
+                    )
+                    out.getOrPut(cursor.getString(msgIdx)) { mutableListOf() }
+                        .add(attachment)
+                }
+            }
+        }
+        return out
+    }
+
+    /**
+     * File names of attachments whose messages fall in the
+     * [deleteMessagesFrom] doomed range. Read BEFORE the delete so the
+     * files can be cleaned up best-effort afterwards.
+     */
+    private fun attachmentFileNamesInRange(
+        db: SupportSQLiteDatabase,
+        conversationId: String,
+        messageId: String,
+    ): List<String> =
+        db.query(
+            "SELECT a.file_name FROM attachments a " +
+                "JOIN messages m ON m.id = a.message_id " +
+                "WHERE m.conversation_id = ? AND m.rowid >= " +
+                "(SELECT rowid FROM messages WHERE id = ? AND conversation_id = ?)",
+            arrayOf<Any?>(conversationId, messageId, conversationId),
+        ).use { cursor ->
+            val idx = cursor.getColumnIndexOrThrow("file_name")
+            buildList {
+                while (cursor.moveToNext()) add(cursor.getString(idx))
             }
         }
 }

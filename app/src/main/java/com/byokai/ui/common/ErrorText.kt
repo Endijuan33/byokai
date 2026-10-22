@@ -55,6 +55,9 @@ fun ProviderError.userMessage(): UiText = when (this) {
 
     is ProviderError.Config ->
         UiText.Res(R.string.error_provider_config, listOf(message))
+
+    is ProviderError.UnsupportedFeature ->
+        UiText.Res(R.string.error_provider_unsupported_feature)
 }
 
 /**

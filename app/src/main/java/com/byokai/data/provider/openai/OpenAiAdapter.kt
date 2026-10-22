@@ -8,7 +8,9 @@ import com.byokai.core.network.RetryPolicy
 import com.byokai.core.network.SseReader
 import com.byokai.domain.chat.ChatEvent
 import com.byokai.domain.chat.ChatRequest
+import com.byokai.domain.model.ChatMessage
 import com.byokai.domain.model.ChatRole
+import com.byokai.domain.model.ImageAttachment
 import com.byokai.domain.model.ModelInfo
 import com.byokai.domain.model.ProviderCapabilities
 import com.byokai.domain.model.ProviderConfig
@@ -16,8 +18,10 @@ import com.byokai.domain.model.ProviderId
 import com.byokai.domain.provider.AiProvider
 import com.byokai.domain.provider.ProviderError
 import com.byokai.domain.provider.ProviderException
+import com.byokai.domain.repository.AttachmentStorage
 import java.io.IOException
 import java.net.SocketTimeoutException
+import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -27,6 +31,12 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -59,8 +69,30 @@ import okio.Buffer
  * Subclassed by [OpenAiCompatibleAdapter] for third-party
  * OpenAI-compatible endpoints: the wire protocol is identical, only the
  * identity (provider id, display name, default base URL) differs.
+ *
+ * Vision (image attachments): turns carrying attachments are sent as a
+ * content-part array — a `{"type":"text"}` part followed by one
+ * `{"type":"image_url","image_url":{"url":"data:<mime>;base64,..."}}`
+ * part per attachment. Text-only turns stay plain JSON strings,
+ * wire-identical to before. Attachments are read via [attachmentStorage]
+ * and base64-encoded with [java.util.Base64] (API 28+, JVM-testable);
+ * images above [MAX_IMAGE_BYTES] are rejected with
+ * [ProviderError.Config] — the attachment pipeline downscales first, so
+ * this is defensive only.
+ *
+ * Honest scope: `capabilities.vision = true` is PROTOCOL-level. Whether
+ * a given model actually accepts images is model-level and varies; a
+ * text-only model answers a vision request with HTTP 400, which
+ * surfaces as [ProviderError.Server].
+ *
+ * DI note: the constructor now takes [AttachmentStorage] as a second
+ * parameter — the coordinator's DI wiring must supply it for both this
+ * adapter and [OpenAiCompatibleAdapter].
  */
-open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
+open class OpenAiAdapter(
+    private val client: OkHttpClient,
+    private val attachmentStorage: AttachmentStorage,
+) : AiProvider {
 
     open override val providerId: ProviderId = ProviderId.OPENAI
     open override val displayName: String = "OpenAI"
@@ -69,6 +101,7 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
         streaming = true,
         systemPrompt = true,
         modelListing = true,
+        vision = true,
     )
 
     /**
@@ -113,10 +146,19 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
             }
             if (baseUrl != null) {
                 val url = baseUrl + CHAT_COMPLETIONS_PATH
+                val dtoMessages = try {
+                    toDtoMessages(request)
+                } catch (e: ProviderException) {
+                    // Attachment read failure (e.g. oversize image): emit as
+                    // a typed error instead of letting it escape the flow.
+                    trySend(ChatEvent.Error(e.error))
+                    close()
+                    return@callbackFlow
+                }
                 val bodyJson = ProviderJson.encodeToString(
                     ChatCompletionsRequest(
                         model = request.modelId,
-                        messages = toDtoMessages(request),
+                        messages = dtoMessages,
                     ),
                 )
                 var attempt = 0
@@ -355,10 +397,16 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
      * Builds the API message list: the system prompt (when non-blank)
      * first as role "system", then the request turns with domain roles
      * mapped to their API strings.
+     *
+     * Suspends because reading attachment bytes via [attachmentStorage]
+     * is suspending. Text-only messages keep a plain-string `content`
+     * (wire-identical to before); messages with attachments get a
+     * content-part array: one `{"type":"text"}` part followed by one
+     * `{"type":"image_url"}` part per attachment.
      */
-    private fun toDtoMessages(request: ChatRequest): List<ChatMessageDto> = buildList {
+    private suspend fun toDtoMessages(request: ChatRequest): List<ChatMessageDto> = buildList {
         request.systemPrompt?.takeIf { it.isNotBlank() }?.let { prompt ->
-            add(ChatMessageDto(role = "system", content = prompt))
+            add(ChatMessageDto(role = "system", content = JsonPrimitive(prompt)))
         }
         for (message in request.messages) {
             val role = when (message.role) {
@@ -366,8 +414,58 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
                 ChatRole.USER -> "user"
                 ChatRole.ASSISTANT -> "assistant"
             }
-            add(ChatMessageDto(role = role, content = message.content))
+            add(ChatMessageDto(role = role, content = messageContent(message)))
         }
+    }
+
+    /**
+     * Builds one message's `content` element: a plain string when the
+     * message has no attachments, otherwise a content-part array with
+     * the text first and one `image_url` data-URL part per attachment.
+     */
+    private suspend fun messageContent(message: ChatMessage): JsonElement {
+        val attachments = message.attachments
+        if (attachments.isEmpty()) return JsonPrimitive(message.content)
+        return JsonArray(
+            buildList {
+                add(
+                    buildJsonObject {
+                        put("type", "text")
+                        put("text", message.content)
+                    },
+                )
+                for (attachment in attachments) {
+                    add(
+                        buildJsonObject {
+                            put("type", "image_url")
+                            putJsonObject("image_url") {
+                                put(
+                                    "url",
+                                    "data:${attachment.mimeType};base64," +
+                                        encodeAttachment(attachment),
+                                )
+                            }
+                        },
+                    )
+                }
+            },
+        )
+    }
+
+    /**
+     * Reads an attachment's bytes and base64-encodes them for the wire.
+     *
+     * Defensive size cap: images above [MAX_IMAGE_BYTES] are rejected
+     * with [ProviderError.Config] — the attachment pipeline downscales
+     * before this point, so a hit here means something went wrong
+     * upstream.
+     */
+    private suspend fun encodeAttachment(attachment: ImageAttachment): String {
+        val bytes = attachmentStorage.readBytes(attachment)
+        if (bytes.size > MAX_IMAGE_BYTES) {
+            throw ProviderException(ProviderError.Config("image too large"))
+        }
+        return Base64.getEncoder().encodeToString(bytes)
     }
 
     /**
@@ -414,6 +512,8 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
         const val MAX_ERROR_BODY_BYTES = 64L * 1024L
         const val MAX_MODEL_LIST_BYTES = 1024L * 1024L
         const val READ_CHUNK_BYTES = 8192L
+        /** Defensive post-processing size cap for one attached image. */
+        const val MAX_IMAGE_BYTES = 15L * 1024L * 1024L
         val JSON_MEDIA_TYPE = "application/json".toMediaType()
     }
 }

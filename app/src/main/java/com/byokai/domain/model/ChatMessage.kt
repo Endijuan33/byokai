@@ -19,8 +19,11 @@ enum class ChatRole {
  *
  * @property role who produced the message.
  * @property content the message text.
+ * @property attachments image attachments travelling with this turn
+ * (Phase 9B). Empty for text-only turns; only USER turns carry them.
  */
 data class ChatMessage(
     val role: ChatRole,
     val content: String,
+    val attachments: List<ImageAttachment> = emptyList(),
 )

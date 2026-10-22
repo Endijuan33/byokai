@@ -1,15 +1,16 @@
 package com.byokai.data.provider.anthropic
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 /**
  * Wire DTOs for the Anthropic Messages API (`POST /v1/messages`).
  *
  * Every field carries a default so a response that omits it still parses;
  * unknown fields are dropped by [com.byokai.core.network.ProviderJson].
- * Field names follow the API's snake_case exactly. Text-only scope:
- * request message `content` is always a plain string, never a
- * content-block array.
+ * Field names follow the API's snake_case exactly. Text-only turns keep
+ * message `content` as a plain string; turns with image attachments use
+ * a content-block array.
  */
 
 /** Request body for `POST /v1/messages`. */
@@ -22,11 +23,16 @@ data class MessagesRequest(
     val messages: List<MessageDto>,
 )
 
-/** One message inside a messages request. */
+/**
+ * One message inside a messages request. [content] is a plain JSON string
+ * for text-only turns, and a content-block array
+ * (`[{"type":"text",...},{"type":"image","source":{...}}]`) for turns
+ * carrying image attachments.
+ */
 @Serializable
 data class MessageDto(
     val role: String,
-    val content: String,
+    val content: JsonElement,
 )
 
 /**

@@ -5,6 +5,7 @@ import com.byokai.domain.chat.ChatEvent
 import com.byokai.domain.chat.ChatRequest
 import com.byokai.domain.model.ChatMessage
 import com.byokai.domain.model.ChatRole
+import com.byokai.domain.model.ImageAttachment
 import com.byokai.domain.model.ModelInfo
 import com.byokai.domain.model.ProviderCapabilities
 import com.byokai.domain.model.ProviderConfig
@@ -80,13 +81,16 @@ class ChatRepositoryImplTest {
 
     private class FakeAdapter(
         var events: List<ChatEvent> = emptyList(),
+        vision: Boolean = false,
     ) : AiProvider {
         var lastApiKey: String? = null
+        var streamChatCalls = 0
 
         override val providerId: ProviderId = ProviderId.OPENAI
         override val displayName: String = "Fake"
         override val defaultBaseUrl: String = "https://fake.example/v1"
-        override val capabilities: ProviderCapabilities = ProviderCapabilities(streaming = true)
+        override val capabilities: ProviderCapabilities =
+            ProviderCapabilities(streaming = true, vision = vision)
 
         override suspend fun listModels(
             config: ProviderConfig,
@@ -104,6 +108,7 @@ class ChatRepositoryImplTest {
             request: ChatRequest,
         ): Flow<ChatEvent> {
             lastApiKey = apiKey
+            streamChatCalls++
             return events.asFlow()
         }
     }
@@ -215,5 +220,68 @@ class ChatRepositoryImplTest {
         assertEquals(1, collected.size)
         val error = collected.single() as ChatEvent.Error
         assertTrue(error.error is ProviderError.Auth)
+    }
+
+    @Test
+    fun `attachments with vision=false adapter emits UnsupportedFeature without calling adapter`() =
+        runTest {
+            val visionless = FakeAdapter(listOf(ChatEvent.Done("hi")))
+            val (impl, _) = repository(adapter = visionless)
+            val visionRequest = request().copy(
+                messages = listOf(
+                    ChatMessage(
+                        ChatRole.USER,
+                        "Describe this",
+                        listOf(
+                            ImageAttachment(
+                                id = "att-1",
+                                fileName = "photo.png",
+                                mimeType = "image/png",
+                                width = 64,
+                                height = 64,
+                            ),
+                        ),
+                    ),
+                ),
+            )
+
+            val collected = impl.streamChat(visionRequest).toList()
+
+            assertEquals(1, collected.size)
+            val error = collected.single() as ChatEvent.Error
+            assertTrue(error.error is ProviderError.UnsupportedFeature)
+            assertEquals(
+                0,
+                visionless.streamChatCalls,
+            )
+        }
+
+    @Test
+    fun `attachments with vision=true adapter reach the adapter`() = runTest {
+        val events = listOf(ChatEvent.Done("seen"))
+        val visionAdapter = FakeAdapter(events, vision = true)
+        val (impl, _) = repository(adapter = visionAdapter)
+        val visionRequest = request().copy(
+            messages = listOf(
+                ChatMessage(
+                    ChatRole.USER,
+                    "Describe this",
+                    listOf(
+                        ImageAttachment(
+                            id = "att-1",
+                            fileName = "photo.png",
+                            mimeType = "image/png",
+                            width = 64,
+                            height = 64,
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val collected = impl.streamChat(visionRequest).toList()
+
+        assertEquals(events, collected)
+        assertEquals(1, visionAdapter.streamChatCalls)
     }
 }

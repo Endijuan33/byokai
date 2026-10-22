@@ -2,6 +2,7 @@ package com.byokai.data.provider.anthropic
 
 import com.byokai.domain.model.ProviderCapabilities
 import com.byokai.domain.model.ProviderId
+import com.byokai.domain.repository.AttachmentStorage
 import okhttp3.OkHttpClient
 
 /**
@@ -22,8 +23,17 @@ import okhttp3.OkHttpClient
  * `EndpointValidator` on every call (HTTPS-only except loopback,
  * userinfo rejected, cloud metadata address blocked), and redirects stay
  * disabled.
+ *
+ * Vision-capable by protocol inheritance: image attachments are sent as
+ * Anthropic content blocks by [AnthropicAdapter]; whether a given
+ * endpoint's model accepts them is up to that endpoint. DI note: the
+ * constructor takes [AttachmentStorage], passed straight through to
+ * the parent.
  */
-class AnthropicCompatibleAdapter(client: OkHttpClient) : AnthropicAdapter(client) {
+class AnthropicCompatibleAdapter(
+    client: OkHttpClient,
+    attachmentStorage: AttachmentStorage,
+) : AnthropicAdapter(client, attachmentStorage) {
 
     override val providerId: ProviderId = ProviderId.ANTHROPIC_COMPATIBLE
     override val displayName: String = "Anthropic-compatible"
@@ -32,5 +42,6 @@ class AnthropicCompatibleAdapter(client: OkHttpClient) : AnthropicAdapter(client
         streaming = true,
         systemPrompt = true,
         modelListing = false,
+        vision = true,
     )
 }

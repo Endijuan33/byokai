@@ -10,6 +10,7 @@ import com.byokai.domain.model.ChatRole
 import com.byokai.domain.model.ProviderConfig
 import com.byokai.domain.model.ProviderId
 import com.byokai.domain.provider.ProviderError
+import com.byokai.domain.repository.FakeAttachmentStorage
 import com.byokai.domain.provider.ProviderException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.cancelAndJoin
@@ -44,7 +45,7 @@ class OpenAiAdapterTest {
     fun setUp() {
         server = MockWebServer()
         server.start()
-        adapter = OpenAiAdapter(HttpClientFactory.create())
+        adapter = OpenAiAdapter(HttpClientFactory.create(), FakeAttachmentStorage())
     }
 
     @After

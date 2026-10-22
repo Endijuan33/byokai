@@ -31,6 +31,7 @@ class ProviderException(
             is ProviderError.Server -> "HTTP ${error.statusCode}: ${error.message}"
             is ProviderError.Parse -> "Malformed response: ${error.message}"
             is ProviderError.Config -> "Configuration problem: ${error.message}"
+            is ProviderError.UnsupportedFeature -> error.message
             ProviderError.EmptyResponse -> "The provider returned an empty response"
         }
     }

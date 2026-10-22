@@ -71,6 +71,16 @@ class ChatRepositoryImpl(
                 emit(ChatEvent.Error(ProviderError.Config("No adapter registered for provider")))
                 return@flow
             }
+        if (request.messages.any { it.attachments.isNotEmpty() } && !adapter.capabilities.vision) {
+            emit(
+                ChatEvent.Error(
+                    ProviderError.UnsupportedFeature(
+                        "This provider does not support image attachments",
+                    ),
+                ),
+            )
+            return@flow
+        }
         adapter.streamChat(config, apiKey, request).collect { event ->
             if (event is ChatEvent.Done && event.fullText.isBlank()) {
                 emit(ChatEvent.Error(ProviderError.EmptyResponse))

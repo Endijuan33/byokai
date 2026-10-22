@@ -4,6 +4,7 @@ import com.byokai.data.local.db.migration.DatabaseMigration
 import com.byokai.data.local.db.migration.DbHandle
 import com.byokai.data.local.db.migration.MigrationRunner
 import com.byokai.data.local.db.migration.MigrationV1ToV2
+import com.byokai.data.local.db.migration.MigrationV2ToV3
 import java.sql.Connection
 import java.sql.DriverManager
 import org.junit.After
@@ -145,7 +146,128 @@ class MigrationTest {
         }
     }
 
-    // ---- v1 schema, verbatim copy of the production v1 onCreate ----
+    // ---- v2 -> v3 (Phase 9B: attachments table) ----
+
+    @Test
+    fun `v2 to v3 creates empty attachments table and preserves data`() {
+        createV2Schema()
+        insertConversation("c1", "Hello", createdAt = 1000L)
+        insertMessage("m1", "c1", "USER", "hi", isPartial = 0)
+
+        MigrationRunner.migrate(db, listOf(MigrationV2ToV3), oldVersion = 2, newVersion = 3)
+
+        // Attachments table exists and starts empty.
+        val count = db.query("SELECT COUNT(*) AS n FROM attachments")
+        assertEquals(0L, (count[0]["n"] as Number).toLong())
+
+        // Existing rows untouched.
+        val messages = db.query("SELECT id, content FROM messages")
+        assertEquals(1, messages.size)
+        assertEquals("hi", messages[0]["content"])
+    }
+
+    @Test
+    fun `v2 to v3 attachment rows round-trip and cascade on message delete`() {
+        createV2Schema()
+        insertConversation("c1", "Hello", createdAt = 1000L)
+        insertMessage("m1", "c1", "USER", "look", isPartial = 0)
+
+        MigrationRunner.migrate(db, listOf(MigrationV2ToV3), oldVersion = 2, newVersion = 3)
+
+        db.execSQL(
+            "INSERT INTO attachments (id, message_id, file_name, mime_type, width, height) " +
+                "VALUES (?, ?, ?, ?, ?, ?)",
+            arrayOf<Any?>("a1", "m1", "a1.jpg", "image/jpeg", 1568, 884),
+        )
+        val rows = db.query(
+            "SELECT id, file_name, mime_type, width, height FROM attachments WHERE message_id = 'm1'",
+        )
+        assertEquals(1, rows.size)
+        assertEquals("a1.jpg", rows[0]["file_name"])
+        assertEquals("image/jpeg", rows[0]["mime_type"])
+        assertEquals(1568L, (rows[0]["width"] as Number).toLong())
+        assertEquals(884L, (rows[0]["height"] as Number).toLong())
+
+        // Deleting the message cascades to its attachment rows.
+        db.execSQL("DELETE FROM messages WHERE id = 'm1'")
+        val after = db.query("SELECT COUNT(*) AS n FROM attachments")
+        assertEquals(0L, (after[0]["n"] as Number).toLong())
+    }
+
+    @Test
+    fun `v1 to v3 walks the whole chain`() {
+        createV1Schema()
+        insertConversation("c1", "Hello", createdAt = 1000L)
+        insertMessage("m1", "c1", "USER", "hi", isPartial = 0)
+
+        MigrationRunner.migrate(
+            db,
+            listOf(MigrationV1ToV2, MigrationV2ToV3),
+            oldVersion = 1,
+            newVersion = 3,
+        )
+
+        assertEquals(
+            "Hello",
+            db.query("SELECT title FROM conversations")[0]["title"],
+        )
+        assertEquals(
+            0L,
+            (db.query("SELECT COUNT(*) AS n FROM attachments")[0]["n"] as Number).toLong(),
+        )
+        assertEquals(
+            0L,
+            (db.query("SELECT COUNT(*) AS n FROM prompts")[0]["n"] as Number).toLong(),
+        )
+    }
+
+    // ---- v1/v2 schemas, verbatim copies of the production onCreate ----
+
+    /**
+     * v2 schema: v1 plus the Milestone 4A additions (`system_prompt`
+     * column, `prompts` table). Verbatim copy of the production v2
+     * onCreate — the migration under test upgrades FROM this.
+     */
+    private fun createV2Schema() {
+        db.execSQL(
+            """
+            CREATE TABLE conversations (
+                id TEXT PRIMARY KEY NOT NULL,
+                title TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                system_prompt TEXT
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE messages (
+                id TEXT PRIMARY KEY NOT NULL,
+                conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                is_partial INTEGER NOT NULL DEFAULT 0
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            CREATE TABLE prompts (
+                id TEXT PRIMARY KEY NOT NULL,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                is_builtin INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            "CREATE INDEX idx_messages_conversation ON messages(conversation_id, created_at)",
+        )
+    }
 
     private fun createV1Schema() {
         db.execSQL(

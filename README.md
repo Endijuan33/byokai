@@ -18,7 +18,7 @@ chat, conversation history, prompt templates, and import/export.
 > (v0.7.0) is published on GitHub Releases. See
 > [docs/ROADMAP.md](docs/ROADMAP.md) for the honest status of every phase.
 
-## Features (current, 0.9.0)
+## Features (current, 0.10.0)
 
 - **Multi-provider BYOK chat**: OpenAI (Chat Completions SSE), Anthropic
   (Messages API), Gemini (`streamGenerateContent`) — each with its own auth
@@ -26,6 +26,14 @@ chat, conversation history, prompt templates, and import/export.
   OpenAI-compatible and Anthropic-compatible adapters that reuse the
   first-party wire logic for third-party and self-hosted endpoints
   ([docs/PROVIDERS.md](docs/PROVIDERS.md))
+- **Image attachments + vision**: attach photos to a message; each
+  adapter encodes them in the provider's native image format. Whether a
+  given model accepts images is decided server-side (text-only models
+  return a provider error, never a silent wrong answer)
+  ([docs/PROVIDERS.md](docs/PROVIDERS.md))
+- **Voice input**: dictate messages via Android's `SpeechRecognizer`
+  (requires Google services on the device; recognition itself runs
+  wherever the platform routes it, not in-app)
 - **Provider catalog with search**: 13 curated providers bundled in-app
   (offline, no network fetch); search filters by name; selecting an entry
   pre-fills the add-provider form (suggested models included, editable);
@@ -45,16 +53,18 @@ chat, conversation history, prompt templates, and import/export.
   and re-prompt on keystore invalidation
   ([docs/SECURITY.md](docs/SECURITY.md))
 - **Local-first conversation history**: hand-rolled versioned SQLite
-  (`byokai.db`, schema v2) — conversations, messages, rename, delete
+  (`byokai.db`, schema v3) — conversations, messages, image attachments,
+  rename, delete
 - **Prompt management**: 4 editable built-in prompt templates, management
   screen (Settings → Prompts), per-conversation system prompt sent via each
   adapter's native channel
 - **Context management**: heuristic token estimate (labeled "est."),
   request-side truncation that keeps the system prompt + newest messages
   within the context window; persisted history is never modified
-- **Export/import**: versioned JSON (`byokai-export` v1) via the Storage
-  Access Framework; 50 MB cap; fresh IDs on import; exports carry
-  conversation text only, never credentials
+- **Export/import**: versioned `byokai-export` format via the Storage
+  Access Framework — v2 ZIP (`export.json` + raw image bytes) or v1 JSON;
+  50 MB cap; fresh IDs on import; exports carry conversation content
+  only, never credentials
   ([docs/EXPORT.md](docs/EXPORT.md))
 - **Settings**: theme System/Light/Dark (applies immediately), Dynamic Color
   toggle, English/Indonesian language (persists, applies on activity

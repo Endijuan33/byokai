@@ -17,9 +17,9 @@ android {
         applicationId = "com.byokai"
         minSdk = 28
         targetSdk = 37
-        versionCode = 10
+        versionCode = 11
         // Overridable from the release workflow via -Pbyokai.versionName=<x.y.z>.
-        versionName = (findProperty("byokai.versionName") as String?) ?: "0.9.0"
+        versionName = (findProperty("byokai.versionName") as String?) ?: "0.10.0"
         // Milestone 3B ships an instrumented test for the keystore-backed
         // credential path; runs on-device only (Phase 5 device matrix), not CI.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -142,6 +142,8 @@ dependencies {
     testImplementation(libs.sqlite.jdbc)
     // Milestone 4B: Compose Material3 markdown rendering for AI answers.
     implementation(libs.markdown.renderer.m3)
+    // Phase 9B: EXIF orientation for the image pipeline.
+    implementation(libs.exifinterface)
 
     // Instrumented tests (keystore path): on-device only, not CI.
     androidTestImplementation(libs.androidx.test.runner)

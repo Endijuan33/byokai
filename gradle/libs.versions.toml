@@ -52,6 +52,10 @@ sqliteJdbc = "3.53.4.0"
 # Compose Markdown renderer (Milestone 4B). Latest stable on
 # repo1.maven.org, verified 2026-10-22.
 markdownRendererM3 = "0.46.0"
+# EXIF orientation reader for the Phase 9B image pipeline (upright stored
+# pixels). Latest stable on dl.google.com, verified 2026-10-22 (1.5.0
+# excluded by the no-alpha rule).
+exifinterface = "1.4.2"
 # Instrumented-test runners. Versions verified against
 # https://dl.google.com/dl/android/maven2/.../maven-metadata.xml
 # on 2026-10-21 (stable).
@@ -94,6 +98,8 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 sqlite-jdbc = { group = "org.xerial", name = "sqlite-jdbc", version.ref = "sqliteJdbc" }
 # Compose Material3 markdown renderer (4B). Android artifact.
 markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3-android", version.ref = "markdownRendererM3" }
+# EXIF orientation for the Phase 9B image pipeline.
+exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 # Instrumented-test dependencies. Versions verified against
 # https://dl.google.com/dl/android/maven2/.../maven-metadata.xml
 # on 2026-10-21 (stable). Used only under src/androidTest.

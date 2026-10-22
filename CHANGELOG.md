@@ -3,6 +3,62 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.10.0] — 2026-10-22
+
+Phase 9B "Multimodal": image attachments with vision, voice input, and
+export format v2.
+
+### Added
+
+- Image attachments: attach photos to any message. Images are stored
+  on-device (`AttachmentStorage`), linked to the message row, and
+  persisted across restarts (DB schema v3).
+- Vision: all five adapters (OpenAI, Anthropic, Gemini,
+  OpenAI-compatible, Anthropic-compatible) encode attachments in the
+  provider's native image message format. Protocol-level support only —
+  whether a given model accepts images is decided server-side; a
+  text-only model returns a provider error (typically HTTP 400),
+  never a silent wrong answer. The `vision` capability flag now means
+  "this adapter can send images", not "every model accepts them".
+- Voice input: dictate message text via Android's `SpeechRecognizer`.
+  Requires Google services on the device; recognition is performed by
+  the platform, not in-app.
+- Export format v2 (ZIP): `export.json` (envelope `"version": 2`,
+  messages with attachment metadata) plus one
+  `attachments/<fileName>` entry per image with the raw bytes — no
+  base64 bloat, no silent attachment loss. Import detects the archive
+  by its `PK\x03\x04` magic; v1 JSON files still import unchanged;
+  each attachment is restored under a fresh `<uuid>.jpg` file name;
+  a missing or corrupt attachment entry is skipped and counted
+  (`ImportSummary.skippedAttachments`) instead of failing the whole
+  import; per-conversation rollback now also deletes attachment files
+  copied before the failure. The 50 MB cap applies to the ZIP size
+  pre-parse, with an additional 50 MB cap on total uncompressed size.
+  The JSON export path is kept for compatibility but carries
+  attachment metadata only, not bytes. See [docs/EXPORT.md](docs/EXPORT.md).
+
+### Changed
+
+- DB schema v2 → v3 (new attachments table).
+- Export envelope version 1 → 2. Newer app versions still import v1
+  JSON exports; v1-era app versions reject v2 outputs via the version
+  gate (forward compatibility was never promised).
+
+### Security
+
+- Export files remain **plaintext** (JSON or ZIP, no encryption):
+  anyone holding the file can read the conversation text and view the
+  images. ZIP entry names are sanitized on import (no path traversal).
+  No API keys, credentials, or keystore material are ever exported —
+  unchanged.
+
+### Validation status
+
+- Vision wire formats: MockWebServer fixtures only — no live vision
+  call has been made from the owner's device yet.
+- Voice input: platform-dependent (Google services required);
+  on-device behavior to be confirmed by the owner.
+
 ## [0.9.0] — 2026-10-22
 
 Phase 9A "Chat parity": message-level actions and conversation management.

@@ -31,10 +31,22 @@ data class GeminiContent(
     val parts: List<GeminiPart> = emptyList(),
 )
 
-/** One text part of a request content or system instruction. */
+/**
+ * Inline (base64) image data carried inside a request part. Serialized
+ * as `{"mimeType":...,"data":...}` inside `GeminiPart.inlineData`.
+ */
+@Serializable
+data class GeminiInlineData(
+    val mimeType: String,
+    val data: String,
+)
+
+/** One part of a request content or system instruction: text, or inline image data. */
 @Serializable
 data class GeminiPart(
     val text: String = "",
+    /** Present only when the part carries an attached image; omitted when null. */
+    val inlineData: GeminiInlineData? = null,
 )
 
 /** One SSE `data:` payload of a streamed Gemini response. */

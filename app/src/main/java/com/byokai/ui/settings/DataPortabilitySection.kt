@@ -28,14 +28,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Export/import section for the settings screen (Milestone 4E).
+ * Export/import section for the settings screen (Milestone 4E, Phase 9B).
  *
- * - Export writes the versioned JSON via SAF `CreateDocument`; the
+ * - Export writes the versioned payload via SAF `CreateDocument`: a ZIP
+ *   (`export.json` + `attachments/`) when the export carries images,
+ *   readable by [ConversationExportManager.importFromBytes]; the
  *   filename carries the export date.
- * - Import reads via SAF `OpenDocument`, validates (size cap, JSON,
- *   format id, version), and — when conversations already exist —
- *   asks for confirmation first, because re-importing the same file
- *   duplicates conversations (import always mints fresh ids).
+ * - Import reads via SAF `OpenDocument`, validates (size cap, ZIP magic
+ *   or JSON, format id, version), and — when conversations already
+ *   exist — asks for confirmation first, because re-importing the same
+ *   file duplicates conversations (import always mints fresh ids).
  * - Outcomes surface through [onMessage] (snackbar); corrupt files
  *   produce a user-friendly error, never a crash or a log with
  *   conversation content.
@@ -60,20 +62,23 @@ fun DataPortabilitySection(
     val importInvalidTemplate = stringResource(R.string.settings_import_invalid)
 
     val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json"),
+        ActivityResultContracts.CreateDocument("application/zip"),
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            val result = exportManager.exportToJson()
+            // Phase 9B: the ZIP carries attachment files alongside
+            // export.json; importFromBytes still accepts legacy v1 JSON.
+            val result = exportManager.exportToZip()
             when (result) {
                 is Result.Success -> {
                     val ok = withContext(Dispatchers.IO) {
                         runCatching {
                             context.contentResolver.openOutputStream(uri)?.use { out ->
-                                out.write(result.data.toByteArray())
+                                result.data.inputStream().use { it.copyTo(out) }
                             } ?: throw IllegalStateException("null stream")
                         }.isSuccess
                     }
+                    runCatching { result.data.delete() }
                     onMessage(if (ok) exportDoneText else exportErrorText)
                 }
                 is Result.Error -> onMessage(exportErrorText)
@@ -113,8 +118,9 @@ fun DataPortabilitySection(
                 return@launch
             }
             // Never log conversation content on failure — only the
-            // user-friendly message below.
-            when (val result = exportManager.importFromJson(bytes.toString(Charsets.UTF_8))) {
+            // user-friendly message below. importFromBytes sniffs the
+            // ZIP magic and falls back to legacy v1 JSON.
+            when (val result = exportManager.importFromBytes(bytes)) {
                 is Result.Success -> {
                     val summary = result.data
                     onMessage(
@@ -136,7 +142,7 @@ fun DataPortabilitySection(
         summary = stringResource(R.string.settings_export_summary),
         onClick = {
             val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
-            exportLauncher.launch("byokai-export-$stamp.json")
+            exportLauncher.launch("byokai-export-$stamp.zip")
         },
     )
     NavRow(
@@ -148,7 +154,8 @@ fun DataPortabilitySection(
                 if (existing.isNotEmpty()) {
                     pendingImportConfirm = true
                 } else {
-                    importLauncher.launch(arrayOf("application/json"))
+                    // Accept both the Phase 9B ZIP and legacy v1 JSON.
+                    importLauncher.launch(arrayOf("application/zip", "application/json"))
                 }
             }
         },
@@ -163,7 +170,7 @@ fun DataPortabilitySection(
                 TextButton(
                     onClick = {
                         pendingImportConfirm = false
-                        importLauncher.launch(arrayOf("application/json"))
+                        importLauncher.launch(arrayOf("application/zip", "application/json"))
                     },
                 ) {
                     Text(stringResource(R.string.settings_import_confirm_ok))

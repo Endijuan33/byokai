@@ -222,9 +222,31 @@ against flagship chat apps while keeping the Phase 5 streaming invariants.
   `ConversationRepository.searchConversations`; `ChatUiMessage` carries
   the persisted row id so UI actions target the right rows.
 
-## Phase 9B/9C — Multimodal / power features — NOT STARTED
+## Phase 9B — Multimodal — SHIPPED (0.10.0, 2026-10-22)
 
-- 9B (multimodal: image input, voice): not started.
+- **Image attachments**: attach photos to a message
+  (`domain.model.ImageAttachment`, on-device `AttachmentStorage`,
+  persisted in DB schema v3).
+- **Vision**: all five adapters encode attachments in the provider's
+  native image format (protocol-level; whether a given model accepts
+  images is decided server-side — text-only models return a provider
+  error, never a silent wrong answer). See
+  [PROVIDERS.md](PROVIDERS.md).
+- **Voice input**: dictate messages via Android `SpeechRecognizer`
+  (requires Google services on the device).
+- **Export v2 ZIP**: `export.json` (envelope version 2, messages with
+  attachment metadata) + `attachments/<fileName>` raw bytes;
+  `PK\x03\x04` magic dispatch on import; v1 JSON still imports; 50 MB
+  cap; per-conversation rollback including copied attachment files.
+  See [EXPORT.md](EXPORT.md).
+
+Honest status: vision wire formats are validated against
+MockWebServer fixtures only — no live vision call has been made from
+the owner's device yet, and OpenAI/Anthropic adapters remain
+MockWebServer-only overall (see [PROVIDERS.md](PROVIDERS.md)).
+
+## Phase 9C — Power features — NOT STARTED
+
 - 9C (power features: web search, artifacts, skills): not started.
 
 ## Phase 9 (maintenance track) — ONGOING

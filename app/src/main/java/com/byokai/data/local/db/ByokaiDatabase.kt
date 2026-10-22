@@ -6,6 +6,7 @@ import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import com.byokai.data.local.db.migration.MigrationRunner
 import com.byokai.data.local.db.migration.MigrationV1ToV2
+import com.byokai.data.local.db.migration.MigrationV2ToV3
 
 /**
  * Process-wide access to the BYOKAI SQLite database (`byokai.db`).
@@ -16,7 +17,7 @@ import com.byokai.data.local.db.migration.MigrationV1ToV2
  * [FrameworkSQLiteOpenHelperFactory]. No Room — KSP has no 2.4.x release
  * for Kotlin 2.4.21, so all SQL here is hand-rolled.
  *
- * Schema (version 2):
+ * Schema (version 3):
  * - `conversations(id TEXT PRIMARY KEY, title TEXT, created_at INTEGER,
  *   updated_at INTEGER, system_prompt TEXT)` — `system_prompt` added in
  *   v2 (Milestone 4A) for per-conversation system instructions; NULL
@@ -28,8 +29,14 @@ import com.byokai.data.local.db.migration.MigrationV1ToV2
  *   INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER)` — added
  *   in v2 (Milestone 4A) for reusable prompt templates; starts empty,
  *   seeded by the repository layer, not by the migration.
+ * - `attachments(id TEXT PRIMARY KEY, message_id TEXT REFERENCES
+ *   messages(id) ON DELETE CASCADE, file_name TEXT, mime_type TEXT,
+ *   width INTEGER, height INTEGER)` — added in v3 (Phase 9B) for
+ *   image-attachment metadata. The raw bytes live in AttachmentStorage
+ *   (app-private files), never in this database.
  * - index `idx_messages_conversation` on `messages(conversation_id,
  *   created_at)`.
+ * - index `idx_attachments_message` on `attachments(message_id)`.
  *
  * Foreign-key constraints are enabled in [onConfigure], so deleting a
  * conversation cascades to its messages.
@@ -50,7 +57,7 @@ import com.byokai.data.local.db.migration.MigrationV1ToV2
 object ByokaiDatabase {
 
     const val DATABASE_NAME = "byokai.db"
-    const val DATABASE_VERSION = 2
+    const val DATABASE_VERSION = 3
 
     /**
      * Every schema migration ever shipped, in version order. The runner
@@ -59,6 +66,7 @@ object ByokaiDatabase {
      */
     private val migrations = listOf(
         MigrationV1ToV2,
+        MigrationV2ToV3,
     )
 
     @Volatile
@@ -85,8 +93,8 @@ object ByokaiDatabase {
         }
 
         /**
-         * Creates the CURRENT schema (v2) directly. Fresh installs never
-         * run migrations; [onUpgrade] handles existing v1 databases.
+         * Creates the CURRENT schema (v3) directly. Fresh installs never
+         * run migrations; [onUpgrade] handles existing v1/v2 databases.
          */
         override fun onCreate(db: SupportSQLiteDatabase) {
             db.execSQL(
@@ -127,6 +135,21 @@ object ByokaiDatabase {
             db.execSQL(
                 "CREATE INDEX idx_messages_conversation " +
                     "ON messages(conversation_id, created_at)",
+            )
+            db.execSQL(
+                """
+                CREATE TABLE attachments (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+                    file_name TEXT NOT NULL,
+                    mime_type TEXT NOT NULL,
+                    width INTEGER NOT NULL,
+                    height INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX idx_attachments_message ON attachments(message_id)",
             )
         }
 

@@ -14,6 +14,9 @@ package com.byokai.domain.model
  * @property isPartial true when the assistant turn was interrupted (error
  * or user stop) before its terminal stream event; the kept text is real
  * stream output, never fabricated.
+ * @property attachments image attachments stored with this message
+ * (Phase 9B). Populated for user turns sent with photos; empty for
+ * text-only turns and for rows written before schema v3.
  */
 data class Message(
     val id: String,
@@ -22,4 +25,5 @@ data class Message(
     val content: String,
     val createdAt: Long,
     val isPartial: Boolean,
+    val attachments: List<ImageAttachment> = emptyList(),
 )

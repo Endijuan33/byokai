@@ -47,4 +47,12 @@ sealed interface ProviderError {
      * missing, or no adapter is registered for its provider family.
      */
     data class Config(val message: String) : ProviderError
+
+    /**
+     * The request asked for a capability the provider adapter does not
+     * support (protocol-level, e.g. image attachments on a text-only
+     * adapter), so the request was rejected before any network call.
+     * The UI must tell the user to switch to a vision-capable provider.
+     */
+    data class UnsupportedFeature(val message: String) : ProviderError
 }

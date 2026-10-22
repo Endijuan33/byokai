@@ -3,6 +3,7 @@ package com.byokai.data.export
 import com.byokai.core.common.Result
 import com.byokai.domain.model.ChatRole
 import com.byokai.ui.conversations.FakeConversationRepository
+import java.nio.file.Files
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -22,6 +23,17 @@ class ByokaiExportTest {
 
     private val plainJson = Json { ignoreUnknownKeys = true }
 
+    /**
+     * Throwaway attachment storage for tests that never touch
+     * attachments. The v2 tests use their own seeded
+     * [FakeAttachmentStorage].
+     */
+    private fun testStorage(): FakeAttachmentStorage =
+        FakeAttachmentStorage(
+            Files.createTempDirectory("byokai-att-test-").toFile()
+                .also { it.deleteOnExit() },
+        )
+
     private suspend fun seededRepo(): FakeConversationRepository {
         val repo = FakeConversationRepository()
         val c1 = (repo.create("Chat one") as Result.Success).data
@@ -35,12 +47,12 @@ class ByokaiExportTest {
 
     @Test
     fun `export produces the versioned envelope`() = runTest {
-        val manager = ConversationExportManager(seededRepo())
+        val manager = ConversationExportManager(seededRepo(), testStorage())
         val json = (manager.exportToJson() as Result.Success).data
 
         val root = plainJson.parseToJsonElement(json).jsonObject
         assertEquals("byokai-export", root["format"]!!.toString().trim('"'))
-        assertEquals("1", root["version"]!!.toString())
+        assertEquals("2", root["version"]!!.toString())
         val parsed = ByokaiExportFormat.parse(json) as Result.Success
         assertEquals(2, parsed.data.conversations.size)
         // Order follows the repository (recency); assert as a set.
@@ -55,7 +67,7 @@ class ByokaiExportTest {
 
     @Test
     fun `export contains no credential material`() = runTest {
-        val manager = ConversationExportManager(seededRepo())
+        val manager = ConversationExportManager(seededRepo(), testStorage())
         val json = (manager.exportToJson() as Result.Success).data.lowercase()
 
         // The export schema has a fixed key set; anything resembling
@@ -80,11 +92,11 @@ class ByokaiExportTest {
     @Test
     fun `round trip preserves content with fresh ids`() = runTest {
         val source = seededRepo()
-        val manager = ConversationExportManager(source)
+        val manager = ConversationExportManager(source, testStorage())
         val json = (manager.exportToJson() as Result.Success).data
 
         val target = FakeConversationRepository()
-        val summary = (ConversationExportManager(target).importFromJson(json) as Result.Success).data
+        val summary = (ConversationExportManager(target, testStorage()).importFromJson(json) as Result.Success).data
         assertEquals(2, summary.importedConversations)
         assertEquals(3, summary.importedMessages)
         assertTrue(summary.skippedConversations.isEmpty())
@@ -111,27 +123,27 @@ class ByokaiExportTest {
 
     @Test
     fun `import into non-empty repo keeps existing conversations`() = runTest {
-        val manager = ConversationExportManager(seededRepo())
+        val manager = ConversationExportManager(seededRepo(), testStorage())
         val json = (manager.exportToJson() as Result.Success).data
 
         val target = FakeConversationRepository()
         target.create("Existing")
         val summary =
-            (ConversationExportManager(target).importFromJson(json) as Result.Success).data
+            (ConversationExportManager(target, testStorage()).importFromJson(json) as Result.Success).data
         assertEquals(2, summary.importedConversations)
         assertEquals(3, target.conversations().first().size)
     }
 
     @Test
     fun `import rejects malformed json`() = runTest {
-        val manager = ConversationExportManager(FakeConversationRepository())
+        val manager = ConversationExportManager(FakeConversationRepository(), testStorage())
         val result = manager.importFromJson("{ not json")
         assertTrue(result is Result.Error)
     }
 
     @Test
     fun `import rejects wrong format id`() = runTest {
-        val manager = ConversationExportManager(FakeConversationRepository())
+        val manager = ConversationExportManager(FakeConversationRepository(), testStorage())
         val json = """{"format":"something-else","version":1,"exportedAt":0,"appVersion":"x","conversations":[]}"""
         val result = manager.importFromJson(json)
         assertTrue(result is Result.Error)
@@ -140,7 +152,7 @@ class ByokaiExportTest {
 
     @Test
     fun `import rejects future version`() = runTest {
-        val manager = ConversationExportManager(FakeConversationRepository())
+        val manager = ConversationExportManager(FakeConversationRepository(), testStorage())
         val json = """{"format":"byokai-export","version":99,"exportedAt":0,"appVersion":"x","conversations":[]}"""
         val result = manager.importFromJson(json)
         assertTrue(result is Result.Error)

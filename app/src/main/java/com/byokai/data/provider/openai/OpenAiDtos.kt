@@ -1,6 +1,7 @@
 package com.byokai.data.provider.openai
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 /**
  * Wire DTOs for the OpenAI chat completions API
@@ -19,11 +20,16 @@ data class ChatCompletionsRequest(
     val stream: Boolean = true,
 )
 
-/** One message inside a chat completions request. */
+/**
+ * One message inside a chat completions request. [content] is a plain
+ * JSON string for text-only turns, and a content-part array
+ * (`[{"type":"text",...},{"type":"image_url",...}]`) for turns carrying
+ * image attachments.
+ */
 @Serializable
 data class ChatMessageDto(
     val role: String,
-    val content: String,
+    val content: JsonElement,
 )
 
 /** One SSE `data:` payload of a streamed chat completion. */

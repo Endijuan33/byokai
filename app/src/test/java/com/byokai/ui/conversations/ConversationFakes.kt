@@ -3,6 +3,7 @@ package com.byokai.ui.conversations
 import com.byokai.core.common.Result
 import com.byokai.domain.model.ChatRole
 import com.byokai.domain.model.Conversation
+import com.byokai.domain.model.ImageAttachment
 import com.byokai.domain.model.Message
 import com.byokai.domain.repository.ConversationRepository
 import java.util.UUID
@@ -102,6 +103,7 @@ class FakeConversationRepository : ConversationRepository {
         role: ChatRole,
         content: String,
         isPartial: Boolean,
+        attachments: List<ImageAttachment>,
     ): Result<Message> {
         if (failWrites) return Result.Error(RuntimeException("simulated IO failure"))
         val message = Message(
@@ -111,6 +113,7 @@ class FakeConversationRepository : ConversationRepository {
             content = content,
             createdAt = tick(),
             isPartial = isPartial,
+            attachments = attachments,
         )
         messages.getOrPut(conversationId) { mutableListOf() }.add(message)
         appendedMessages.add(message)

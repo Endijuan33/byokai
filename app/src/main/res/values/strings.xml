@@ -40,6 +40,7 @@
     <string name="error_provider_parse">Could not read the provider\'s response: %1$s</string>
     <string name="error_provider_empty_response">The provider returned an empty response. Try again or rephrase your message.</string>
     <string name="error_provider_config">Configuration problem: %1$s</string>
+    <string name="error_provider_unsupported_feature">This provider does not support image attachments.</string>
 
     <!-- Home additions -->
     <string name="chat_start">Start chat</string>
@@ -184,4 +185,30 @@
     <string name="settings_import_confirm_title">Import conversations?</string>
     <string name="settings_import_confirm_body">You already have conversations. Imported conversations are added as new copies — importing the same file twice creates duplicates.</string>
     <string name="settings_import_confirm_ok">Import</string>
+
+    <!-- Multimodal: image attachments (Phase 9B) -->
+    <string name="attach_add">Attach image</string>
+    <string name="attach_gallery">Gallery</string>
+    <string name="attach_camera">Camera</string>
+    <string name="attach_remove">Remove image</string>
+    <string name="attach_thumbnail">Attached image</string>
+    <string name="attach_close">Close</string>
+    <string name="attach_allow">Allow</string>
+    <string name="image_process_error">Couldn\'t process that image. Please try another one.</string>
+    <string name="camera_permission_rationale">BYOKAI needs camera access so you can take photos to attach to your messages.</string>
+    <string name="camera_permission_denied">Camera access is off. Enable it in Settings → Apps → BYOKAI → Permissions to take photos.</string>
+
+    <!-- Multimodal: voice input (Phase 9B) -->
+    <string name="voice_start">Voice input</string>
+    <string name="voice_stop">Stop listening</string>
+    <string name="voice_listening">Listening…</string>
+    <string name="voice_allow">Allow</string>
+    <string name="voice_permission_rationale">BYOKAI needs microphone access to turn your speech into text.</string>
+    <string name="voice_permission_denied">Microphone access is off. Enable it in Settings → Apps → BYOKAI → Permissions to use voice input.</string>
+    <string name="voice_error_network">Voice input needs a network connection right now.</string>
+    <string name="voice_error_no_match">Didn\'t catch that — try again.</string>
+    <string name="voice_error_permission">Microphone permission was denied.</string>
+    <string name="voice_error_busy">Voice input is busy — try again in a moment.</string>
+    <string name="voice_error_unsupported">Voice input isn\'t available on this device (it needs Google\'s speech recognition service).</string>
+    <string name="voice_error_unknown">Voice input failed — please try again.</string>
 </resources>

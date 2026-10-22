@@ -3,6 +3,8 @@ package com.byokai.di
 import android.content.Context
 import com.byokai.core.network.HttpClientFactory
 import com.byokai.data.chat.ChatRepositoryImpl
+import com.byokai.data.local.FileAttachmentStorage
+import com.byokai.data.local.ImageProcessor
 import com.byokai.data.local.datastore.ProviderConfigHolder
 import com.byokai.data.local.datastore.SettingsDataStoreHolder
 import com.byokai.data.local.db.ByokaiDatabase
@@ -21,11 +23,13 @@ import com.byokai.data.repository.SqlitePromptRepository
 import com.byokai.data.security.TinkCredentialStore
 import com.byokai.domain.chat.ChatRepository
 import com.byokai.domain.provider.ProviderRegistry
+import com.byokai.domain.repository.AttachmentStorage
 import com.byokai.domain.repository.ConversationRepository
 import com.byokai.domain.repository.PromptRepository
 import com.byokai.domain.repository.ProviderConfigRepository
 import com.byokai.domain.repository.SettingsRepository
 import com.byokai.domain.security.CredentialStore
+import java.io.File
 import okhttp3.OkHttpClient
 
 /**
@@ -80,11 +84,11 @@ class AppContainer(context: Context) {
      */
     val providerRegistry: ProviderRegistry by lazy {
         ProviderRegistry().apply {
-            register(OpenAiAdapter(httpClient))
-            register(AnthropicAdapter(httpClient))
-            register(GeminiAdapter(httpClient))
-            register(OpenAiCompatibleAdapter(httpClient))
-            register(AnthropicCompatibleAdapter(httpClient))
+            register(OpenAiAdapter(httpClient, attachmentStorage))
+            register(AnthropicAdapter(httpClient, attachmentStorage))
+            register(GeminiAdapter(httpClient, attachmentStorage))
+            register(OpenAiCompatibleAdapter(httpClient, attachmentStorage))
+            register(AnthropicCompatibleAdapter(httpClient, attachmentStorage))
         }
     }
 
@@ -107,6 +111,27 @@ class AppContainer(context: Context) {
     }
 
     /**
+     * App-private image storage for chat attachments (Phase 9B).
+     *
+     * Files live under `<filesDir>/attachments/` — never on shared
+     * storage and never in a backup transport (the whole files tree is
+     * private to the app; the database is backup-excluded separately).
+     */
+    val attachmentStorage: AttachmentStorage by lazy {
+        FileAttachmentStorage(
+            File(appContext.filesDir, "attachments").apply { mkdirs() },
+        )
+    }
+
+    /**
+     * Gallery/camera image pipeline (Phase 9B): downscale + EXIF
+     * orientation fix + JPEG normalize into [attachmentStorage].
+     */
+    val imageProcessor: ImageProcessor by lazy {
+        ImageProcessor(appContext.contentResolver, attachmentStorage)
+    }
+
+    /**
      * Persisted conversation history (Milestone 3E).
      *
      * Hand-rolled SQLite via [ByokaiDatabase] (no Room — no KSP for
@@ -115,7 +140,7 @@ class AppContainer(context: Context) {
      * [credentialStore].
      */
     val conversationRepository: ConversationRepository by lazy {
-        SqliteConversationRepository(ByokaiDatabase.get(appContext))
+        SqliteConversationRepository(ByokaiDatabase.get(appContext), attachmentStorage)
     }
 
     /**
@@ -129,13 +154,14 @@ class AppContainer(context: Context) {
     }
 
     /**
-     * Conversation export/import as versioned JSON (Milestone 4E).
+     * Conversation export/import as versioned JSON (Milestone 4E) or ZIP
+     * with attachments (Phase 9B).
      *
      * Carries conversation text and metadata only — the underlying
      * [conversationRepository] has no access to API keys or other
      * credentials, so they cannot leak into an export.
      */
     val exportManager: ConversationExportManager by lazy {
-        ConversationExportManager(conversationRepository)
+        ConversationExportManager(conversationRepository, attachmentStorage)
     }
 }

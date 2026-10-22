@@ -8,7 +8,9 @@ import com.byokai.core.network.RetryPolicy
 import com.byokai.core.network.SseReader
 import com.byokai.domain.chat.ChatEvent
 import com.byokai.domain.chat.ChatRequest
+import com.byokai.domain.model.ChatMessage
 import com.byokai.domain.model.ChatRole
+import com.byokai.domain.model.ImageAttachment
 import com.byokai.domain.model.ModelInfo
 import com.byokai.domain.model.ProviderCapabilities
 import com.byokai.domain.model.ProviderConfig
@@ -16,8 +18,10 @@ import com.byokai.domain.model.ProviderId
 import com.byokai.domain.provider.AiProvider
 import com.byokai.domain.provider.ProviderError
 import com.byokai.domain.provider.ProviderException
+import com.byokai.domain.repository.AttachmentStorage
 import java.io.IOException
 import java.net.SocketTimeoutException
+import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -27,6 +31,12 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -60,8 +70,30 @@ import okio.Buffer
  * Subclassed by [AnthropicCompatibleAdapter] for third-party
  * Anthropic-compatible endpoints: the wire protocol is identical, only
  * the identity (provider id, display name, default base URL) differs.
+ *
+ * Vision (image attachments): turns carrying attachments are sent as a
+ * content-block array — a `{"type":"text"}` block followed by one
+ * `{"type":"image","source":{"type":"base64","media_type":<mime>,
+ * "data":<base64>}}` block per attachment. Text-only turns stay plain
+ * JSON strings, wire-identical to before. Attachments are read via
+ * [attachmentStorage] and base64-encoded with [java.util.Base64]
+ * (API 28+, JVM-testable); images above [MAX_IMAGE_BYTES] are rejected
+ * with [ProviderError.Config] — the attachment pipeline downscales
+ * first, so this is defensive only.
+ *
+ * Honest scope: `capabilities.vision = true` is PROTOCOL-level. Whether
+ * a given model actually accepts images is model-level and varies; a
+ * text-only model answers a vision request with HTTP 400, which
+ * surfaces as [ProviderError.Server].
+ *
+ * DI note: the constructor now takes [AttachmentStorage] as a second
+ * parameter — the coordinator's DI wiring must supply it for both this
+ * adapter and [AnthropicCompatibleAdapter].
  */
-open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
+open class AnthropicAdapter(
+    private val client: OkHttpClient,
+    private val attachmentStorage: AttachmentStorage,
+) : AiProvider {
 
     open override val providerId: ProviderId = ProviderId.ANTHROPIC
     open override val displayName: String = "Anthropic"
@@ -70,6 +102,7 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
         streaming = true,
         systemPrompt = true,
         modelListing = false,
+        vision = true,
     )
 
     /**
@@ -139,7 +172,17 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
             }
             if (baseUrl != null) {
                 val url = baseUrl + MESSAGES_PATH
-                val bodyJson = ProviderJson.encodeToString(toMessagesRequest(request))
+                val dtoRequest = try {
+                    toMessagesRequest(request)
+                } catch (e: ProviderException) {
+                    // Attachment read failure (e.g. oversize image): emit
+                    // as a typed error instead of letting it escape the
+                    // flow.
+                    trySend(ChatEvent.Error(e.error))
+                    close()
+                    return@callbackFlow
+                }
+                val bodyJson = ProviderJson.encodeToString(dtoRequest)
                 var attempt = 0
                 var streamStarted = false
                 val fullText = StringBuilder()
@@ -346,7 +389,7 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
                 model = modelId,
                 max_tokens = TEST_CONNECTION_MAX_TOKENS,
                 stream = false,
-                messages = listOf(MessageDto(role = "user", content = "Hi")),
+                messages = listOf(MessageDto(role = "user", content = JsonPrimitive("Hi"))),
             ),
         )
         val httpRequest = Request.Builder()
@@ -380,8 +423,14 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
      * Builds the Messages API request: the system prompt (when non-blank)
      * plus any [ChatRole.SYSTEM] message texts folded into the top-level
      * `system` field, and the user/assistant turns as `messages`.
+     *
+     * Suspends because reading attachment bytes via [attachmentStorage]
+     * is suspending. Text-only messages keep a plain-string `content`
+     * (wire-identical to before); messages with attachments get a
+     * content-block array: one `{"type":"text"}` block followed by one
+     * `{"type":"image"}` block per attachment.
      */
-    private fun toMessagesRequest(request: ChatRequest): MessagesRequest {
+    private suspend fun toMessagesRequest(request: ChatRequest): MessagesRequest {
         val systemParts = buildList {
             request.systemPrompt?.takeIf { it.isNotBlank() }?.let { add(it) }
             for (message in request.messages) {
@@ -395,7 +444,7 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
                 ChatRole.USER -> "user"
                 ChatRole.ASSISTANT -> "assistant"
             }
-            MessageDto(role = role, content = message.content)
+            MessageDto(role = role, content = messageContent(message))
         }
         return MessagesRequest(
             model = request.modelId,
@@ -403,6 +452,53 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
             system = system,
             messages = messages,
         )
+    }
+
+    /**
+     * Builds one message's `content` element: a plain string when the
+     * message has no attachments, otherwise a content-block array with
+     * the text first and one base64 `image` block per attachment.
+     */
+    private suspend fun messageContent(message: ChatMessage): JsonElement {
+        val attachments = message.attachments
+        if (attachments.isEmpty()) return JsonPrimitive(message.content)
+        return JsonArray(
+            buildList {
+                add(
+                    buildJsonObject {
+                        put("type", "text")
+                        put("text", message.content)
+                    },
+                )
+                for (attachment in attachments) {
+                    add(
+                        buildJsonObject {
+                            put("type", "image")
+                            putJsonObject("source") {
+                                put("type", "base64")
+                                put("media_type", attachment.mimeType)
+                                put("data", encodeAttachment(attachment))
+                            }
+                        },
+                    )
+                }
+            },
+        )
+    }
+
+    /**
+     * Reads an attachment's bytes and base64-encodes them for the wire.
+     *
+     * Defensive size cap: images above [MAX_IMAGE_BYTES] are rejected
+     * with [ProviderError.Config] — the attachment pipeline downscales
+     * first, so a hit here means something went wrong upstream.
+     */
+    private suspend fun encodeAttachment(attachment: ImageAttachment): String {
+        val bytes = attachmentStorage.readBytes(attachment)
+        if (bytes.size > MAX_IMAGE_BYTES) {
+            throw ProviderException(ProviderError.Config("image too large"))
+        }
+        return Base64.getEncoder().encodeToString(bytes)
     }
 
     /**
@@ -471,6 +567,8 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
         const val TEST_CONNECTION_MAX_TOKENS = 1
         const val MAX_ERROR_BODY_BYTES = 64L * 1024L
         const val READ_CHUNK_BYTES = 8192L
+        /** Defensive post-processing size cap for one attached image. */
+        const val MAX_IMAGE_BYTES = 15L * 1024L * 1024L
         val JSON_MEDIA_TYPE = "application/json".toMediaType()
     }
 }

@@ -9,6 +9,7 @@ import com.byokai.core.network.SseReader
 import com.byokai.domain.chat.ChatEvent
 import com.byokai.domain.chat.ChatRequest
 import com.byokai.domain.model.ChatRole
+import com.byokai.domain.model.ImageAttachment
 import com.byokai.domain.model.ModelInfo
 import com.byokai.domain.model.ProviderCapabilities
 import com.byokai.domain.model.ProviderConfig
@@ -16,8 +17,10 @@ import com.byokai.domain.model.ProviderId
 import com.byokai.domain.provider.AiProvider
 import com.byokai.domain.provider.ProviderError
 import com.byokai.domain.provider.ProviderException
+import com.byokai.domain.repository.AttachmentStorage
 import java.io.IOException
 import java.net.SocketTimeoutException
+import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -44,14 +47,34 @@ import okio.Buffer
  * The API key travels as an `x-goog-api-key` header (Gemini does not use
  * `Authorization: Bearer`).
  *
+ * Vision (image attachments): a user turn carrying attachments is sent
+ * with its text part (when non-blank) followed by one
+ * `{"inlineData":{"mimeType":<mime>,"data":<base64>}}` part per
+ * attachment. Text-only turns are wire-identical to before. Attachments
+ * are read via [attachmentStorage] and base64-encoded with
+ * [java.util.Base64] (API 28+, JVM-testable); images above
+ * [MAX_IMAGE_BYTES] are rejected with [ProviderError.Config] — the
+ * attachment pipeline downscales first, so this is defensive only.
+ *
+ * Honest scope: `capabilities.vision = true` is PROTOCOL-level. Whether
+ * a given model actually accepts images is model-level and varies; a
+ * text-only model answers a vision request with HTTP 400, which
+ * surfaces as [ProviderError.Server].
+ *
  * Security notes:
  * - The [apiKey] is sent only as the `x-goog-api-key` header and is never
  *   logged, never stored, and never embedded in error messages.
  * - `config.baseUrl` is re-validated with [EndpointValidator] on every
  *   call; redirects are disabled at the HTTP client level so the key
  *   header cannot leak to a redirect target.
+ *
+ * DI note: the constructor now takes [AttachmentStorage] as a second
+ * parameter — the coordinator's DI wiring must supply it.
  */
-class GeminiAdapter(private val client: OkHttpClient) : AiProvider {
+class GeminiAdapter(
+    private val client: OkHttpClient,
+    private val attachmentStorage: AttachmentStorage,
+) : AiProvider {
 
     override val providerId: ProviderId = ProviderId.GEMINI
     override val displayName: String = "Google Gemini"
@@ -60,6 +83,7 @@ class GeminiAdapter(private val client: OkHttpClient) : AiProvider {
         streaming = true,
         systemPrompt = true,
         modelListing = true,
+        vision = true,
     )
 
     /**
@@ -114,7 +138,16 @@ class GeminiAdapter(private val client: OkHttpClient) : AiProvider {
                 } else {
                     val url = baseUrl + STREAM_PATH_PREFIX +
                         encodeModelId(request.modelId) + STREAM_PATH_SUFFIX + "?alt=sse"
-                    val bodyJson = ProviderJson.encodeToString(toDtoRequest(request))
+                    val bodyJson = try {
+                        ProviderJson.encodeToString(toDtoRequest(request))
+                    } catch (e: ProviderException) {
+                        // Attachment read failure (e.g. oversize image):
+                        // emit as a typed error instead of letting it
+                        // escape the flow.
+                        trySend(ChatEvent.Error(e.error))
+                        close()
+                        return@callbackFlow
+                    }
                     var attempt = 0
                     var streamStarted = false
                     val fullText = StringBuilder()
@@ -352,8 +385,16 @@ class GeminiAdapter(private val client: OkHttpClient) : AiProvider {
      * [ChatRole.SYSTEM] turns in the message list — folded into
      * `systemInstruction`, since the Gemini contents API only accepts
      * "user" and "model" roles.
+     *
+     * Suspends because reading attachment bytes via [attachmentStorage]
+     * is suspending. A user turn with attachments gets the text part
+     * (when non-blank) followed by one `inlineData` part per attachment;
+     * text-only turns are wire-identical to before. Attachments on
+     * assistant turns are ignored — providers do not accept image input
+     * from the model's own turns, and re-sending model-generated images
+     * as input is out of scope.
      */
-    private fun toDtoRequest(request: ChatRequest): GeminiGenerateContentRequest {
+    private suspend fun toDtoRequest(request: ChatRequest): GeminiGenerateContentRequest {
         val systemTexts = buildList {
             request.systemPrompt?.takeIf { it.isNotBlank() }?.let(::add)
             request.messages
@@ -362,11 +403,35 @@ class GeminiAdapter(private val client: OkHttpClient) : AiProvider {
                 .filter { it.isNotBlank() }
                 .forEach(::add)
         }
-        val contents = request.messages.mapNotNull { message ->
-            when (message.role) {
-                ChatRole.USER -> GeminiContent("user", listOf(GeminiPart(message.content)))
-                ChatRole.ASSISTANT -> GeminiContent("model", listOf(GeminiPart(message.content)))
-                ChatRole.SYSTEM -> null // Folded into systemInstruction above.
+        val contents = buildList {
+            for (message in request.messages) {
+                when (message.role) {
+                    ChatRole.USER -> {
+                        val parts = if (message.attachments.isEmpty()) {
+                            listOf(GeminiPart(message.content))
+                        } else {
+                            buildList {
+                                if (message.content.isNotBlank()) {
+                                    add(GeminiPart(message.content))
+                                }
+                                for (attachment in message.attachments) {
+                                    add(
+                                        GeminiPart(
+                                            inlineData = GeminiInlineData(
+                                                mimeType = attachment.mimeType,
+                                                data = encodeAttachment(attachment),
+                                            ),
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                        add(GeminiContent("user", parts))
+                    }
+                    ChatRole.ASSISTANT ->
+                        add(GeminiContent("model", listOf(GeminiPart(message.content))))
+                    ChatRole.SYSTEM -> { /* Folded into systemInstruction above. */ }
+                }
             }
         }
         return GeminiGenerateContentRequest(
@@ -374,6 +439,21 @@ class GeminiAdapter(private val client: OkHttpClient) : AiProvider {
             systemInstruction = systemTexts.takeIf { it.isNotEmpty() }
                 ?.let { texts -> GeminiSystemInstruction(texts.map(::GeminiPart)) },
         )
+    }
+
+    /**
+     * Reads an attachment's bytes and base64-encodes them for the wire.
+     *
+     * Defensive size cap: images above [MAX_IMAGE_BYTES] are rejected
+     * with [ProviderError.Config] — the attachment pipeline downscales
+     * first, so a hit here means something went wrong upstream.
+     */
+    private suspend fun encodeAttachment(attachment: ImageAttachment): String {
+        val bytes = attachmentStorage.readBytes(attachment)
+        if (bytes.size > MAX_IMAGE_BYTES) {
+            throw ProviderException(ProviderError.Config("image too large"))
+        }
+        return Base64.getEncoder().encodeToString(bytes)
     }
 
     /**
@@ -456,6 +536,8 @@ class GeminiAdapter(private val client: OkHttpClient) : AiProvider {
         const val MAX_ERROR_BODY_BYTES = 64L * 1024L
         const val MAX_MODEL_LIST_BYTES = 1024L * 1024L
         const val READ_CHUNK_BYTES = 8192L
+        /** Defensive post-processing size cap for one attached image. */
+        const val MAX_IMAGE_BYTES = 15L * 1024L * 1024L
         val JSON_MEDIA_TYPE = "application/json".toMediaType()
     }
 }

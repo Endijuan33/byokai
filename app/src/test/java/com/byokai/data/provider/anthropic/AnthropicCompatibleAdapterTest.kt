@@ -7,6 +7,7 @@ import com.byokai.domain.model.ChatMessage
 import com.byokai.domain.model.ChatRole
 import com.byokai.domain.model.ProviderConfig
 import com.byokai.domain.model.ProviderId
+import com.byokai.domain.repository.FakeAttachmentStorage
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -35,7 +36,7 @@ class AnthropicCompatibleAdapterTest {
     fun setUp() {
         server = MockWebServer()
         server.start()
-        adapter = AnthropicCompatibleAdapter(HttpClientFactory.create())
+        adapter = AnthropicCompatibleAdapter(HttpClientFactory.create(), FakeAttachmentStorage())
     }
 
     @After

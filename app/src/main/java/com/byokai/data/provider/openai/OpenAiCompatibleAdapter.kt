@@ -7,6 +7,7 @@ import com.byokai.domain.model.ProviderConfig
 import com.byokai.domain.model.ProviderId
 import com.byokai.domain.provider.ProviderError
 import com.byokai.domain.provider.ProviderException
+import com.byokai.domain.repository.AttachmentStorage
 import okhttp3.OkHttpClient
 
 /**
@@ -32,8 +33,17 @@ import okhttp3.OkHttpClient
  * re-validated with `EndpointValidator` on every call (HTTPS-only except
  * loopback, userinfo rejected, cloud metadata address blocked), and
  * redirects stay disabled.
+ *
+ * Vision-capable by protocol inheritance: image attachments are sent as
+ * OpenAI content-part arrays by [OpenAiAdapter]; whether a given
+ * endpoint's model accepts them is up to that endpoint. DI note: the
+ * constructor takes [AttachmentStorage], passed straight through to
+ * the parent.
  */
-class OpenAiCompatibleAdapter(client: OkHttpClient) : OpenAiAdapter(client) {
+class OpenAiCompatibleAdapter(
+    client: OkHttpClient,
+    attachmentStorage: AttachmentStorage,
+) : OpenAiAdapter(client, attachmentStorage) {
 
     override val providerId: ProviderId = ProviderId.OPENAI_COMPATIBLE
     override val displayName: String = "OpenAI-compatible"
@@ -42,6 +52,7 @@ class OpenAiCompatibleAdapter(client: OkHttpClient) : OpenAiAdapter(client) {
         streaming = true,
         systemPrompt = true,
         modelListing = true,
+        vision = true,
     )
 
     override suspend fun listModels(

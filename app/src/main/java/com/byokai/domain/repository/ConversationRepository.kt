@@ -55,12 +55,19 @@ interface ConversationRepository {
      * Appends a message and bumps the conversation's `updatedAt` in the
      * same transaction, so the list ordering never observes a message
      * without its recency bump.
+     *
+     * [attachments] (Phase 9B) are stored as metadata rows in the same
+     * transaction; their files must already exist in
+     * [AttachmentStorage] (written by
+     * [com.byokai.data.local.ImageProcessor] at pick time). Only USER
+     * turns carry attachments; other roles pass the empty default.
      */
     suspend fun appendMessage(
         conversationId: String,
         role: ChatRole,
         content: String,
         isPartial: Boolean,
+        attachments: List<ImageAttachment> = emptyList(),
     ): Result<Message>
 
     /**

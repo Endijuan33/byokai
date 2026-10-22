@@ -40,6 +40,7 @@
     <string name="error_provider_parse">Tidak dapat membaca respons provider: %1$s</string>
     <string name="error_provider_empty_response">Provider mengembalikan respons kosong. Coba lagi atau ubah pesan Anda.</string>
     <string name="error_provider_config">Masalah konfigurasi: %1$s</string>
+    <string name="error_provider_unsupported_feature">Provider ini tidak mendukung lampiran gambar.</string>
 
     <!-- Home additions -->
     <string name="chat_start">Mulai chat</string>
@@ -184,4 +185,30 @@
     <string name="settings_import_confirm_title">Impor percakapan?</string>
     <string name="settings_import_confirm_body">Anda sudah memiliki percakapan. Percakapan yang diimpor ditambahkan sebagai salinan baru — mengimpor file yang sama dua kali akan menciptakan duplikat.</string>
     <string name="settings_import_confirm_ok">Impor</string>
+
+    <!-- Multimodal: lampiran gambar (Fase 9B) -->
+    <string name="attach_add">Lampirkan gambar</string>
+    <string name="attach_gallery">Galeri</string>
+    <string name="attach_camera">Kamera</string>
+    <string name="attach_remove">Hapus gambar</string>
+    <string name="attach_thumbnail">Gambar terlampir</string>
+    <string name="attach_close">Tutup</string>
+    <string name="attach_allow">Izinkan</string>
+    <string name="image_process_error">Gambar tidak dapat diproses. Coba gambar lain.</string>
+    <string name="camera_permission_rationale">BYOKAI memerlukan akses kamera agar Anda dapat mengambil foto untuk dilampirkan ke pesan.</string>
+    <string name="camera_permission_denied">Akses kamera dimatikan. Aktifkan di Setelan → Aplikasi → BYOKAI → Izin untuk mengambil foto.</string>
+
+    <!-- Multimodal: input suara (Fase 9B) -->
+    <string name="voice_start">Input suara</string>
+    <string name="voice_stop">Berhenti mendengarkan</string>
+    <string name="voice_listening">Mendengarkan…</string>
+    <string name="voice_allow">Izinkan</string>
+    <string name="voice_permission_rationale">BYOKAI memerlukan akses mikrofon untuk mengubah ucapan Anda menjadi teks.</string>
+    <string name="voice_permission_denied">Akses mikrofon dimatikan. Aktifkan di Setelan → Aplikasi → BYOKAI → Izin untuk memakai input suara.</string>
+    <string name="voice_error_network">Input suara membutuhkan koneksi jaringan saat ini.</string>
+    <string name="voice_error_no_match">Tidak terdengar jelas — coba lagi.</string>
+    <string name="voice_error_permission">Izin mikrofon ditolak.</string>
+    <string name="voice_error_busy">Input suara sedang sibuk — coba lagi sebentar lagi.</string>
+    <string name="voice_error_unsupported">Input suara tidak tersedia di perangkat ini (memerlukan layanan pengenalan suara Google).</string>
+    <string name="voice_error_unknown">Input suara gagal — silakan coba lagi.</string>
 </resources>

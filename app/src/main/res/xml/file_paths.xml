@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider paths (Phase 9B multimodal).
+    - "attachments": the app-private attachments/ dir where processed
+      image attachments live (AttachmentStorage).
+    - "camera": the cache dir, used for the full-res photo captured by
+      the camera intent before ImageProcessor downscales it.
+-->
+<paths>
+    <files-path name="attachments" path="attachments/" />
+    <cache-path name="camera" path="." />
+</paths>

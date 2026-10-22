@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    BYOKAI manifest. Phase 1 keeps it minimal on purpose: no permissions are
-    declared because the Phase 1 app performs no network, storage, or
-    notification work. Permissions are added per-phase with justification
+    BYOKAI manifest. Permissions are added per-phase with justification
     in docs/ARCHITECTURE.md.
+    - RECORD_AUDIO (Phase 9B): voice input via SpeechRecognizer; only
+      used while the user holds the mic button flow on the chat screen.
+    - CAMERA (Phase 9B): optional photo capture for chat image
+      attachments; only used via the attach menu on the chat screen.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:name=".ByokaiApplication"
@@ -27,6 +32,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Phase 9B: shares image attachment files with the camera app
+             (TakePicture contract) via content URIs. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

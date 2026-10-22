@@ -1,8 +1,9 @@
 # Providers (Phase 3, current 0.8.0)
 
 This document describes the provider system **as implemented** (Phase 3,
-milestones 3A–3E; extended by reliability fixes in Phase 5 and the
-provider catalog + generic adapters in Phase 8). The contract is
+milestones 3A–3E; extended by reliability fixes in Phase 5, the provider
+catalog + generic adapters in Phase 8, and vision/image input in Phase
+9B). The contract is
 `domain.provider.AiProvider` (`providerId`, `displayName`, `defaultBaseUrl`,
 `capabilities`, `listModels`, `testConnection`, `streamChat`); each adapter
 owns its auth scheme, message format, streaming protocol, and error mapping —
@@ -267,14 +268,44 @@ best-effort basis and **never contain the API key**.
 | `streaming` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `systemPrompt` | ✅ | ✅ (top-level `system` field) | ✅ (`systemInstruction`) | ✅ | ✅ |
 | `modelListing` | ✅ (`GET /models`) | ❌ (no endpoint — returns config `modelIds`) | ✅ (`GET /v1beta/models`) | ✅ best-effort (falls back to manual ids) | ❌ (manual ids only) |
-| `vision` | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `vision` | ✅ protocol | ✅ protocol | ✅ protocol | ✅ protocol | ✅ protocol |
 | `toolCalling` | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+### Vision support (Phase 9B)
+
+`vision: true` means the **adapter can encode image attachments into
+the provider's native message format** — it is a protocol-level
+claim, not a per-model guarantee:
+
+| Adapter | Image wire format |
+|---|---|
+| OpenAI | Chat Completions content parts: `{"type":"image_url","image_url":{"url":"data:<mime>;base64,…"}}` |
+| Anthropic | Messages API image blocks: `{"type":"image","source":{"type":"base64","media_type":"…","data":"…"}}` |
+| Gemini | `streamGenerateContent` parts: `{"inlineData":{"mimeType":"…","data":"…"}}` |
+| OpenAI-compat / Anthropic-compat | Reuse the first-party wire logic above |
+
+Whether a given **model** accepts images is decided server-side and
+varies by model: sending images to a text-only model returns a
+provider error (typically HTTP 400, surfaced as `InvalidModel` /
+`InvalidRequest`), never a silent wrong answer. The capability flag
+therefore gates the *UI affordance* (attach button); model
+compatibility remains the server's verdict. Image bytes are read
+from the on-device attachment store at send time and base64-encoded
+in memory only — they are never persisted to the provider config or
+the credential store.
+
+> **Device-test status (2026-10-22).** Vision encoding is validated
+> against MockWebServer fixtures only; no live vision call has been
+> made from the owner's device yet. What the fixtures prove is the
+> wire format per adapter (table above) — not that any particular
+> model accepts images.
 
 ## Honest limits
 
-- **Text-only.** No vision/image input and no tool/function calling are
-  implemented in any adapter; the capability flags exist precisely so
-  the UI never offers these.
+- **No tool/function calling** is implemented in any adapter; the
+  capability flag exists precisely so the UI never offers it. Vision
+  (image input) shipped in Phase 9B — see above; model-level support
+  is server-side and varies by model.
 - Streaming is the only completion mode; there is no non-streaming chat
   path besides Anthropic's connection test.
 - Adapter unit tests use scripted MockWebServer fixtures (see
