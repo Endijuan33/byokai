@@ -44,6 +44,7 @@ data class ConversationsUiState(
  *
  * No Android dependencies — JVM-unit-testable.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ConversationsViewModel(
     private val repository: ConversationRepository,
 ) : ViewModel() {
@@ -64,16 +65,18 @@ class ConversationsViewModel(
     private val _openConversation = Channel<String>(Channel.BUFFERED)
     val openConversation: Flow<String> = _openConversation.receiveAsFlow()
 
-    @OptIn(ExperimentalCoroutinesApi::class)
+    private val searchResults: Flow<List<Conversation>> =
+        _searchQuery.flatMapLatest { query ->
+            if (query.isBlank()) {
+                repository.conversations()
+            } else {
+                repository.searchConversations(query)
+            }
+        }
+
     init {
         viewModelScope.launch {
-            _searchQuery.flatMapLatest { query ->
-                if (query.isBlank()) {
-                    repository.conversations()
-                } else {
-                    repository.searchConversations(query)
-                }
-            }.collect { conversations ->
+            searchResults.collect { conversations ->
                 _uiState.update {
                     it.copy(conversations = conversations, isLoading = false)
                 }
