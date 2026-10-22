@@ -431,8 +431,9 @@ class ConversationExportManager(
 
     /**
      * Reads a ZIP archive into entry-name -> bytes. Only `export.json`
-     * and `attachments/*` entries with safe names are kept; anything
-     * else (including path-traversal attempts like `../`) is ignored.
+     * and entries under the `attachments/` prefix with safe names are
+     * kept; anything else (including path-traversal attempts like
+     * `../`) is ignored.
      * The TOTAL uncompressed size is capped at [ByokaiExportFormat.MAX_BYTES]
      * — enforced incrementally while reading, so a highly compressible
      * archive cannot OOM the importer.

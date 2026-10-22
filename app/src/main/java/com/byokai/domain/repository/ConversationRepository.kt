@@ -3,6 +3,7 @@ package com.byokai.domain.repository
 import com.byokai.core.common.Result
 import com.byokai.domain.model.ChatRole
 import com.byokai.domain.model.Conversation
+import com.byokai.domain.model.ImageAttachment
 import com.byokai.domain.model.Message
 import kotlinx.coroutines.flow.Flow
 
