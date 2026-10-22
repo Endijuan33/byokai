@@ -405,7 +405,7 @@ class ProvidersViewModelTest {
         assertNotNull(draft)
         assertEquals(ProviderId.OPENAI_COMPATIBLE, draft!!.providerId)
         assertEquals("DeepSeek", draft.displayName)
-        assertEquals("https://api.deepseek.com", draft.baseUrl)
+        assertEquals("https://api.deepseek.com/v1", draft.baseUrl)
         assertEquals(listOf("deepseek-chat", "deepseek-reasoner"), draft.modelIds)
         assertEquals("deepseek-chat", draft.defaultModelId)
         assertTrue(draft.isNew)
