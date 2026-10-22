@@ -108,7 +108,7 @@ Two different kinds of validation exist in this project and they are not
 interchangeable:
 
 - **Unit-tested (CI)** — JVM unit tests, lint, dependency review. All
-  phases are validated this way (253 unit tests green at 0.6.0).
+  phases are validated this way (253 unit tests green at 0.7.0).
 - **Device-tested (owner's own phone, own keys)** — manual checklists the
   owner runs on his own device. Completed: **Phase 4** (copy button,
   Prompts UI, link taps, system prompt per conversation, export/import)
@@ -132,13 +132,28 @@ security config (cleartext forbidden, no pinning), dependency audit
 upgraded), API 28–37 audit (no unguarded newer-API calls; lint NewApi
 green; device-only behaviors honestly listed).
 
-## Phase 7 — Release engineering — NOT STARTED
+## Phase 7 — Release engineering — SHIPPED (0.7.0)
 
-Release signing operational (the four signing secrets configured — they
-are still expected, not yet set), APK signature validation, AAB
-publishing, changelog/versioning discipline, GitHub Releases, install
-and key-recovery documentation. Acceptance: a signed release installable
-and updatable on a real device.
+Everything preparable without the release keystore is prepared and
+CI-validated; the first signed release itself is the owner's one-time
+action (the four signing secrets are still expected, not yet set).
+
+- Release workflow audit: fails fast with a clear error when secrets are
+  missing; never auto-generates a keystore; never signs with the debug key.
+- **Signer guard** (`scripts/check-apk-signer.sh`): the Release workflow
+  refuses any APK signed with the committed debug keystore; CI proves the
+  guard fires on every push (expected-failure run against the debug-signed
+  R8-validation APK).
+- AAB signature verification (`jarsigner -verify`) in the Release workflow.
+- **Version discipline**: the workflow refuses a `versionName` that does not
+  match the repository — bump `app/build.gradle.kts` + CHANGELOG first.
+- `docs/RELEASE.md` rewritten: one-time keystore setup with certificate
+  fingerprint recording, secret storage, pre-release checklist,
+  independent release verification, install/update guidance (APK vs AAB),
+  key recovery and rotation honesty.
+- Acceptance note: a signed release installable and updatable on a real
+  device is **explicitly pending** the owner's secrets setup + first
+  Release workflow run — that is the designed handoff, not a failure.
 
 ## Phase 8 — Continuous improvement — NOT STARTED
 

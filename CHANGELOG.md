@@ -3,6 +3,32 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.7.0] — 2026-10-22
+
+Phase 7: Release engineering. Everything preparable without the release
+keystore is prepared and CI-validated; the first signed release itself is
+the owner's one-time action (signing secrets still expected, not yet set).
+
+### Added
+
+- `scripts/check-apk-signer.sh`: release-signer guard that refuses APKs
+  signed with the committed debug keystore. The Release workflow runs it
+  after `apksigner verify --print-certs`; CI proves the guard fires on
+  every push by running it against the deliberately debug-signed
+  R8-validation APK and requiring it to fail.
+- Release workflow: AAB signature verification (`jarsigner -verify`).
+- Release workflow: version-discipline gate — the requested `versionName`
+  must match the repository's `versionName`; bump the repo
+  (`app/build.gradle.kts` + CHANGELOG) before running the workflow.
+- `docs/RELEASE.md` rewritten: one-time keystore setup with fingerprint
+  recording, secret storage, pre-release checklist, independent release
+  verification (`apksigner` / `keytool -printcert` + checksums),
+  install/update guidance (APK vs AAB), key recovery and rotation honesty.
+
+### Changed
+
+- Version bump 0.7.0 (versionCode 7).
+
 ## [0.6.0] — 2026-10-22
 
 Phase 6: Security & Compatibility.

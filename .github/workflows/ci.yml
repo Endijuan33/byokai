@@ -71,6 +71,19 @@ jobs:
           ANDROID_KEY_PASSWORD: byokai-debug
         run: gradle assembleRelease --stacktrace
 
+      - name: Prove release-signer guard fires on debug-signed APK
+        # Phase 7: scripts/check-apk-signer.sh is the guard that the REAL
+        # release workflow uses to refuse debug-signed "releases". Here we
+        # prove the guard actually fires: the R8-validation APK above IS
+        # debug-signed by design, so the script MUST exit non-zero. If the
+        # guard ever goes silent, this step fails and CI goes red.
+        run: |
+          if bash scripts/check-apk-signer.sh app/build/outputs/apk/release/app-release.apk; then
+            echo "::error::Signer guard did NOT fire on a debug-signed APK — the release gate is broken."
+            exit 1
+          fi
+          echo "Guard correctly refused the debug-signed APK."
+
       - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v7.0.2

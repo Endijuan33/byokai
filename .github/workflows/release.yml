@@ -6,6 +6,9 @@
 #   ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
 # The workflow FAILS with a clear message when any secret is missing. It never
 # generates a keystore automatically and never signs a release with the debug key.
+# Two extra release gates (Phase 7): the requested versionName must match the
+# repository's versionName (version discipline), and the signed APK must not
+# carry the committed debug keystore's certificate (scripts/check-apk-signer.sh).
 #
 # Action versions below are pinned to full semver tags verified on 2026-10-21
 # via the GitHub Releases API.
@@ -44,6 +47,24 @@ jobs:
             echo "::error::versionName must be MAJOR.MINOR.PATCH (got '$VERSION_NAME')"
             exit 1
           fi
+
+      - name: Check version matches repository
+        # Single source of truth: the repo's default versionName (together
+        # with its versionCode and CHANGELOG entry) must be bumped BEFORE
+        # running the release workflow. The workflow input only selects
+        # which repo state to release; it never invents a version on its
+        # own, so a release can never disagree with the repository.
+        run: |
+          REPO_VERSION=$(grep -oP 'versionName = \(findProperty\("byokai\.versionName"\) as String\?\) \?: "\K[0-9]+\.[0-9]+\.[0-9]+' app/build.gradle.kts | head -n 1)
+          if [ -z "$REPO_VERSION" ]; then
+            echo "::error::Could not read the default versionName from app/build.gradle.kts"
+            exit 1
+          fi
+          if [ "$VERSION_NAME" != "$REPO_VERSION" ]; then
+            echo "::error::Workflow input versionName ($VERSION_NAME) does not match the repository's versionName ($REPO_VERSION). Bump versionName/versionCode in app/build.gradle.kts and add a CHANGELOG.md entry first, then re-run with the same version."
+            exit 1
+          fi
+          echo "Version $VERSION_NAME matches the repository."
 
       - name: Verify signing secrets are configured
         id: secrets-check
@@ -109,6 +130,14 @@ jobs:
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -n 1)
           echo "Using apksigner: $APKSIGNER"
           "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk
+          # Guard: a release must NEVER be signed with the committed debug
+          # keystore. Fails loudly if it is (see scripts/check-apk-signer.sh).
+          bash scripts/check-apk-signer.sh app/build/outputs/apk/release/app-release.apk
+
+      - name: Verify AAB signature
+        # AABs use JAR signing; jarsigner (from the JDK) verifies it.
+        run: |
+          jarsigner -verify app/build/outputs/bundle/release/app-release.aab
 
       - name: Generate SHA-256 checksums
         run: |

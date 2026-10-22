@@ -86,6 +86,16 @@ validates the full R8 pipeline on every push via a dedicated
 (validation artifact only) — the real `release.yml` still fails
 loudly until the release signing secrets are configured.
 
+## Release signer guard
+
+`scripts/check-apk-signer.sh <apk>` refuses APKs signed with the
+committed debug keystore (compares the APK signer certificate SHA-256
+against `debug.keystore`). The Release workflow runs it after
+`apksigner verify --print-certs`; CI proves the guard fires on every
+push by running it against the deliberately debug-signed R8-validation
+APK and requiring it to fail. Run it from the repository root
+(it needs `ANDROID_HOME` and `keytool` on `PATH`).
+
 ## Artifacts
 
 - `ci.yml` uploads `byokai-debug-apk` (the debug APK, 30-day retention),
