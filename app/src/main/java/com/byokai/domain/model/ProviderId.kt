@@ -9,7 +9,11 @@ import kotlinx.serialization.Serializable
  * - [OPENAI], [ANTHROPIC], [GEMINI]: first-party APIs with their own
  *   request/response shapes.
  * - [OPENAI_COMPATIBLE]: any custom endpoint that speaks the OpenAI chat
- *   API shape; served by the OpenAI adapter with a user-supplied base URL.
+ *   API shape; served by the OpenAI-compatible adapter with a
+ *   user-supplied base URL.
+ * - [ANTHROPIC_COMPATIBLE]: any custom endpoint that speaks the Anthropic
+ *   Messages API shape; served by the Anthropic-compatible adapter with a
+ *   user-supplied base URL.
  */
 @Serializable
 enum class ProviderId {
@@ -24,4 +28,7 @@ enum class ProviderId {
 
     /** Custom endpoint served by the OpenAI adapter. */
     OPENAI_COMPATIBLE,
+
+    /** Custom endpoint served by the Anthropic adapter. */
+    ANTHROPIC_COMPATIBLE,
 }

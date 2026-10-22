@@ -7,8 +7,10 @@ import com.byokai.data.local.datastore.ProviderConfigHolder
 import com.byokai.data.local.datastore.SettingsDataStoreHolder
 import com.byokai.data.local.db.ByokaiDatabase
 import com.byokai.data.provider.anthropic.AnthropicAdapter
+import com.byokai.data.provider.anthropic.AnthropicCompatibleAdapter
 import com.byokai.data.provider.gemini.GeminiAdapter
 import com.byokai.data.provider.openai.OpenAiAdapter
+import com.byokai.data.provider.openai.OpenAiCompatibleAdapter
 import com.byokai.data.repository.DataStoreProviderConfigRepository
 import com.byokai.data.repository.SettingsRepositoryImpl
 import com.byokai.data.repository.SqliteConversationRepository
@@ -71,13 +73,18 @@ class AppContainer(context: Context) {
      * Adapters for the provider families the app can talk to.
      *
      * OpenAI first (Milestone 3C); Anthropic and Gemini added in
-     * Milestone 3D. New adapters register here.
+     * Milestone 3D. The generic OpenAI-compatible and
+     * Anthropic-compatible adapters (Milestone 8) reuse the first-party
+     * wire implementations for third-party and self-hosted endpoints.
+     * New adapters register here.
      */
     val providerRegistry: ProviderRegistry by lazy {
         ProviderRegistry().apply {
             register(OpenAiAdapter(httpClient))
             register(AnthropicAdapter(httpClient))
             register(GeminiAdapter(httpClient))
+            register(OpenAiCompatibleAdapter(httpClient))
+            register(AnthropicCompatibleAdapter(httpClient))
         }
     }
 

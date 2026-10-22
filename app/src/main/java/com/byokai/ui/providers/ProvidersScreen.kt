@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
@@ -70,7 +71,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.byokai.ByokaiApplication
 import com.byokai.R
 import com.byokai.domain.model.ProviderConfig
+import com.byokai.domain.model.ProviderId
 import com.byokai.domain.provider.AiProvider
+import com.byokai.domain.provider.CatalogEntry
 
 /**
  * Provider configuration list with an editor bottom sheet.
@@ -128,7 +131,7 @@ fun ProvidersScreen(onBackClick: () -> Unit) {
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.addNew() }) {
+            FloatingActionButton(onClick = { viewModel.openCatalogPicker() }) {
                 Icon(
                     imageVector = Icons.Filled.Add,
                     contentDescription = stringResource(R.string.providers_add),
@@ -192,6 +195,16 @@ fun ProvidersScreen(onBackClick: () -> Unit) {
     }
 
     val editing = uiState.editing
+    if (uiState.catalogOpen) {
+        ProviderCatalogSheet(
+            query = uiState.catalogQuery,
+            entries = viewModel.filteredCatalog(),
+            onQueryChange = viewModel::updateCatalogQuery,
+            onSelectEntry = viewModel::selectCatalogEntry,
+            onSelectCustom = viewModel::selectCustomProvider,
+            onDismiss = viewModel::closeCatalogPicker,
+        )
+    }
     if (editing != null) {
         ProviderEditorSheet(
             draft = editing,

@@ -73,6 +73,14 @@
     <string name="providers_test_no_key">No API key saved. Save a key first.</string>
     <string name="providers_test_missing">Provider not found.</string>
     <string name="providers_refresh_models">Refresh models</string>
+    <string name="providers_catalog_title">Choose a provider</string>
+    <string name="providers_catalog_search_hint">Search providers</string>
+    <string name="providers_catalog_empty">No providers match your search</string>
+    <string name="providers_catalog_suggested">%1$d suggested models</string>
+    <string name="providers_catalog_custom_title">Custom provider</string>
+    <string name="providers_catalog_custom_body">An endpoint that is not listed. Your API key will be sent to this endpoint — only use endpoints you trust.</string>
+    <string name="providers_catalog_openai_compatible">OpenAI-compatible</string>
+    <string name="providers_catalog_anthropic_compatible">Anthropic-compatible</string>
     <string name="providers_refresh_empty">The provider returned no models.</string>
     <string name="providers_http_warning">Warning: cleartext HTTP is only appropriate for a local server.</string>
     <string name="providers_delete">Delete</string>

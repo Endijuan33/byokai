@@ -73,6 +73,14 @@
     <string name="providers_test_no_key">Belum ada API key tersimpan. Simpan kunci terlebih dahulu.</string>
     <string name="providers_test_missing">Penyedia tidak ditemukan.</string>
     <string name="providers_refresh_models">Muat ulang model</string>
+    <string name="providers_catalog_title">Pilih penyedia</string>
+    <string name="providers_catalog_search_hint">Cari penyedia</string>
+    <string name="providers_catalog_empty">Tidak ada penyedia yang cocok</string>
+    <string name="providers_catalog_suggested">%1$d model disarankan</string>
+    <string name="providers_catalog_custom_title">Penyedia kustom</string>
+    <string name="providers_catalog_custom_body">Endpoint yang tidak ada di daftar. API key milikmu akan dikirim ke endpoint ini — hanya gunakan endpoint yang kamu percaya.</string>
+    <string name="providers_catalog_openai_compatible">OpenAI-compatible</string>
+    <string name="providers_catalog_anthropic_compatible">Anthropic-compatible</string>
     <string name="providers_refresh_empty">Provider tidak mengembalikan model apa pun.</string>
     <string name="providers_http_warning">Peringatan: HTTP tanpa enkripsi hanya cocok untuk server lokal.</string>
     <string name="providers_delete">Hapus</string>

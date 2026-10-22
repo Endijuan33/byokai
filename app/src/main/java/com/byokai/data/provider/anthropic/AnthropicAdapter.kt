@@ -52,13 +52,17 @@ import okio.Buffer
  * - `config.baseUrl` is re-validated with [EndpointValidator] on every
  *   call; redirects are disabled at the HTTP client level so the key
  *   cannot leak to a redirect target.
+ *
+ * Subclassed by [AnthropicCompatibleAdapter] for third-party
+ * Anthropic-compatible endpoints: the wire protocol is identical, only
+ * the identity (provider id, display name, default base URL) differs.
  */
-class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
+open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
 
-    override val providerId: ProviderId = ProviderId.ANTHROPIC
-    override val displayName: String = "Anthropic"
-    override val defaultBaseUrl: String = "https://api.anthropic.com"
-    override val capabilities: ProviderCapabilities = ProviderCapabilities(
+    open override val providerId: ProviderId = ProviderId.ANTHROPIC
+    open override val displayName: String = "Anthropic"
+    open override val defaultBaseUrl: String = "https://api.anthropic.com"
+    open override val capabilities: ProviderCapabilities = ProviderCapabilities(
         streaming = true,
         systemPrompt = true,
         modelListing = false,

@@ -48,13 +48,17 @@ import okio.Buffer
  * - `config.baseUrl` is re-validated with [EndpointValidator] on every
  *   call; redirects are disabled at the HTTP client level so the
  *   Authorization header cannot leak to a redirect target.
+ *
+ * Subclassed by [OpenAiCompatibleAdapter] for third-party
+ * OpenAI-compatible endpoints: the wire protocol is identical, only the
+ * identity (provider id, display name, default base URL) differs.
  */
-class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
+open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
 
-    override val providerId: ProviderId = ProviderId.OPENAI
-    override val displayName: String = "OpenAI"
-    override val defaultBaseUrl: String = "https://api.openai.com"
-    override val capabilities: ProviderCapabilities = ProviderCapabilities(
+    open override val providerId: ProviderId = ProviderId.OPENAI
+    open override val displayName: String = "OpenAI"
+    open override val defaultBaseUrl: String = "https://api.openai.com"
+    open override val capabilities: ProviderCapabilities = ProviderCapabilities(
         streaming = true,
         systemPrompt = true,
         modelListing = true,

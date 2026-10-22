@@ -361,4 +361,99 @@ class ProvidersViewModelTest {
 
             assertEquals(before, vm.uiState.value.editing)
         }
+
+    private fun catalogViewModel(): ProvidersViewModel {
+        val registry = ProviderRegistry().apply {
+            register(FakeAdapter(providerId = ProviderId.OPENAI_COMPATIBLE))
+            register(FakeAdapter(providerId = ProviderId.ANTHROPIC_COMPATIBLE))
+        }
+        return ProvidersViewModel(InMemoryConfigRepo(), FakeCredentialStore(), registry)
+    }
+
+    @Test
+    fun `catalog picker opens and filters by query`() = runTest(testDispatcher) {
+        val vm = catalogViewModel()
+        advanceUntilIdle()
+
+        vm.openCatalogPicker()
+        assertTrue(vm.uiState.value.catalogOpen)
+        assertEquals(
+            com.byokai.domain.provider.ProviderCatalog.entries,
+            vm.filteredCatalog(),
+        )
+
+        vm.updateCatalogQuery("deep")
+        assertEquals("deep", vm.uiState.value.catalogQuery)
+        assertEquals(listOf("deepseek"), vm.filteredCatalog().map { it.id })
+
+        vm.closeCatalogPicker()
+        assertFalse(vm.uiState.value.catalogOpen)
+        assertEquals("", vm.uiState.value.catalogQuery)
+    }
+
+    @Test
+    fun `selectCatalogEntry prefills draft from the entry`() = runTest(testDispatcher) {
+        val vm = catalogViewModel()
+        advanceUntilIdle()
+
+        vm.openCatalogPicker()
+        val entry = com.byokai.domain.provider.ProviderCatalog.entries
+            .first { it.id == "deepseek" }
+        vm.selectCatalogEntry(entry)
+
+        val draft = vm.uiState.value.editing
+        assertNotNull(draft)
+        assertEquals(ProviderId.OPENAI_COMPATIBLE, draft!!.providerId)
+        assertEquals("DeepSeek", draft.displayName)
+        assertEquals("https://api.deepseek.com", draft.baseUrl)
+        assertEquals(listOf("deepseek-chat", "deepseek-reasoner"), draft.modelIds)
+        assertEquals("deepseek-chat", draft.defaultModelId)
+        assertTrue(draft.isNew)
+        assertFalse(vm.uiState.value.catalogOpen)
+    }
+
+    @Test
+    fun `selectCatalogEntry with no suggested models prefills a blank model field`() =
+        runTest(testDispatcher) {
+            val vm = catalogViewModel()
+            advanceUntilIdle()
+
+            val entry = com.byokai.domain.provider.ProviderCatalog.entries
+                .first { it.id == "lmstudio" }
+            vm.selectCatalogEntry(entry)
+
+            val draft = vm.uiState.value.editing
+            assertNotNull(draft)
+            assertEquals(listOf(""), draft!!.modelIds)
+            assertNull(draft.defaultModelId)
+        }
+
+    @Test
+    fun `selectCustomProvider opens a blank draft for compatible families`() =
+        runTest(testDispatcher) {
+            val vm = catalogViewModel()
+            advanceUntilIdle()
+
+            vm.openCatalogPicker()
+            vm.selectCustomProvider(ProviderId.ANTHROPIC_COMPATIBLE)
+
+            val draft = vm.uiState.value.editing
+            assertNotNull(draft)
+            assertEquals(ProviderId.ANTHROPIC_COMPATIBLE, draft!!.providerId)
+            assertEquals("", draft.displayName)
+            assertEquals("", draft.baseUrl)
+            assertEquals(listOf(""), draft.modelIds)
+            assertFalse(vm.uiState.value.catalogOpen)
+        }
+
+    @Test
+    fun `selectCustomProvider ignores first-party families`() = runTest(testDispatcher) {
+        val vm = catalogViewModel()
+        advanceUntilIdle()
+
+        vm.selectCustomProvider(ProviderId.OPENAI)
+
+        assertNull(vm.uiState.value.editing)
+        assertFalse(vm.uiState.value.catalogOpen)
+    }
 }

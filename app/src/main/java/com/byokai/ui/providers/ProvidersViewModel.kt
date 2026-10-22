@@ -8,6 +8,8 @@ import com.byokai.core.common.UiText
 import com.byokai.domain.model.ProviderConfig
 import com.byokai.domain.model.ProviderId
 import com.byokai.domain.provider.AiProvider
+import com.byokai.domain.provider.CatalogEntry
+import com.byokai.domain.provider.ProviderCatalog
 import com.byokai.domain.provider.ProviderRegistry
 import com.byokai.domain.repository.ProviderConfigRepository
 import com.byokai.domain.security.CredentialStore
@@ -90,6 +92,10 @@ data class ProvidersUiState(
     val testResult: Map<String, TestState> = emptyMap(),
     /** Registered adapters, for the provider-family dropdown. */
     val providers: List<AiProvider> = emptyList(),
+    /** Whether the provider-catalog picker sheet is open. */
+    val catalogOpen: Boolean = false,
+    /** Current search text filtering the provider catalog. */
+    val catalogQuery: String = "",
 )
 
 /**
@@ -159,9 +165,93 @@ class ProvidersViewModel(
         }
     }
 
-    /** Opens the editor for an existing [config]. */
-    fun edit(config: ProviderConfig) {
+    /** Opens the provider-catalog picker (searchable provider list). */
+    fun openCatalogPicker() {
+        _uiState.update { it.copy(catalogOpen = true, catalogQuery = "") }
+    }
+
+    /** Closes the provider-catalog picker without selecting anything. */
+    fun closeCatalogPicker() {
+        _uiState.update { it.copy(catalogOpen = false, catalogQuery = "") }
+    }
+
+    /** Updates the catalog search text. */
+    fun updateCatalogQuery(query: String) {
+        _uiState.update { it.copy(catalogQuery = query) }
+    }
+
+    /** Catalog entries matching the current search query. */
+    fun filteredCatalog(): List<CatalogEntry> =
+        ProviderCatalog.search(_uiState.value.catalogQuery)
+
+    /**
+     * Opens the editor prefilled from a catalog [entry]: display name,
+     * base URL, adapter family, and suggested models. Every field stays
+     * editable — the catalog is a starting point, not a lock-in.
+     *
+     * Entries without suggested models (e.g. LM Studio, whose models are
+     * user-loaded) prefill a single blank model field for the user to
+     * fill in.
+     */
+    fun selectCatalogEntry(entry: CatalogEntry) {
+        if (providerRegistry.get(entry.providerId) == null) return
+        val now = System.currentTimeMillis()
+        val models = entry.suggestedModels.ifEmpty { listOf("") }
         _uiState.update {
+            it.copy(
+                catalogOpen = false,
+                catalogQuery = "",
+                editing = ProviderConfigDraft(
+                    id = UUID.randomUUID().toString(),
+                    providerId = entry.providerId,
+                    displayName = entry.displayName,
+                    baseUrl = entry.defaultBaseUrl,
+                    modelIds = models,
+                    defaultModelId = models.firstOrNull { model -> model.isNotBlank() },
+                    createdAt = now,
+                    isNew = true,
+                    hasSavedKey = false,
+                ),
+            )
+        }
+    }
+
+    /**
+     * Opens the editor for a fully custom endpoint: the user picks the
+     * wire protocol ([ProviderId.OPENAI_COMPATIBLE] or
+     * [ProviderId.ANTHROPIC_COMPATIBLE]) and types the base URL by hand.
+     * Anything else is ignored — only the two generic families have no
+     * fixed base URL.
+     */
+    fun selectCustomProvider(providerId: ProviderId) {
+        if (providerId != ProviderId.OPENAI_COMPATIBLE &&
+            providerId != ProviderId.ANTHROPIC_COMPATIBLE
+        ) {
+            return
+        }
+        if (providerRegistry.get(providerId) == null) return
+        val now = System.currentTimeMillis()
+        _uiState.update {
+            it.copy(
+                catalogOpen = false,
+                catalogQuery = "",
+                editing = ProviderConfigDraft(
+                    id = UUID.randomUUID().toString(),
+                    providerId = providerId,
+                    displayName = "",
+                    baseUrl = "",
+                    modelIds = listOf(""),
+                    defaultModelId = null,
+                    createdAt = now,
+                    isNew = true,
+                    hasSavedKey = false,
+                ),
+            )
+        }
+    }
+
+    /** Opens the editor for an existing [config]. */
+    fun edit(config: ProviderConfig) {        _uiState.update {
             it.copy(
                 editing = ProviderConfigDraft(
                     id = config.id,
