@@ -106,6 +106,42 @@ class SqliteConversationRepository(
             flow { emit(withContext(Dispatchers.IO) { queryMessages(conversationId) }) }
         }
 
+    override fun searchConversations(query: String): Flow<List<Conversation>> {
+        if (query.isBlank()) return conversations()
+        return refresh.onStart { emit(Unit) }.flatMapLatest {
+            flow { emit(withContext(Dispatchers.IO) { querySearchConversations(query) }) }
+        }
+    }
+
+    override suspend fun deleteMessagesFrom(
+        conversationId: String,
+        messageId: String,
+    ): Result<Unit> = ioWrite {
+        val db = helper.writableDatabase
+        db.beginTransaction()
+        try {
+            // rowid >= the target's rowid deletes the target row and
+            // every row inserted after it (insertion order is the turn
+            // order). rowid is monotonic per insert, so unlike
+            // created_at it cannot collide when two appends land in the
+            // same millisecond. When messageId does not exist the
+            // subquery yields NULL, `>= NULL` is never true, and nothing
+            // is deleted.
+            db.execSQL(
+                "DELETE FROM messages WHERE conversation_id = ? AND rowid >= " +
+                    "(SELECT rowid FROM messages WHERE id = ? AND conversation_id = ?)",
+                arrayOf<Any?>(conversationId, messageId, conversationId),
+            )
+            db.execSQL(
+                "UPDATE conversations SET updated_at = ? WHERE id = ?",
+                arrayOf<Any?>(System.currentTimeMillis(), conversationId),
+            )
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     override suspend fun appendMessage(
         conversationId: String,
         role: ChatRole,
@@ -194,6 +230,46 @@ class SqliteConversationRepository(
                 }
             }
         }
+
+    /**
+     * Title-or-content substring search (case-insensitive LIKE).
+     * The LIKE pattern is passed as a bound argument — never
+     * interpolated — so query text cannot inject SQL. LIKE wildcards
+     * (`%`, `_`) inside the query are escaped.
+     */
+    private fun querySearchConversations(query: String): List<Conversation> {
+        val pattern = "%" + query
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_") + "%"
+        return helper.readableDatabase.query(
+            "SELECT DISTINCT c.id, c.title, c.created_at, c.updated_at, c.system_prompt " +
+                "FROM conversations c LEFT JOIN messages m ON m.conversation_id = c.id " +
+                "WHERE c.title LIKE ? ESCAPE '\\' OR m.content LIKE ? ESCAPE '\\' " +
+                "ORDER BY c.updated_at DESC",
+            arrayOf<Any?>(pattern, pattern),
+        ).use { cursor ->
+            val idIdx = cursor.getColumnIndexOrThrow("id")
+            val titleIdx = cursor.getColumnIndexOrThrow("title")
+            val createdIdx = cursor.getColumnIndexOrThrow("created_at")
+            val updatedIdx = cursor.getColumnIndexOrThrow("updated_at")
+            val promptIdx = cursor.getColumnIndexOrThrow("system_prompt")
+            buildList {
+                while (cursor.moveToNext()) {
+                    add(
+                        Conversation(
+                            id = cursor.getString(idIdx),
+                            title = cursor.getString(titleIdx),
+                            createdAt = cursor.getLong(createdIdx),
+                            updatedAt = cursor.getLong(updatedIdx),
+                            systemPrompt = if (cursor.isNull(promptIdx)) null
+                            else cursor.getString(promptIdx),
+                        ),
+                    )
+                }
+            }
+        }
+    }
 
     /**
      * Nullable TEXT read that tolerates the column holding SQL NULL

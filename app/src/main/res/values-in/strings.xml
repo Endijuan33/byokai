@@ -109,6 +109,12 @@
     <string name="chat_dismiss_error">Tutup</string>
     <string name="chat_generating">Membuat respons…</string>
     <string name="chat_partial">Respons sebagian — stream terputus.</string>
+    <string name="chat_copy">Salin</string>
+    <string name="chat_regenerate">Buat ulang</string>
+    <string name="chat_edit">Ubah</string>
+    <string name="chat_save">Simpan</string>
+    <string name="chat_message_actions">Aksi pesan</string>
+    <string name="chat_edit_message_title">Ubah pesan</string>
 
     <!-- Conversations (history) -->
     <string name="conversations_title">Percakapan</string>
@@ -124,6 +130,14 @@
     <string name="conversations_save_error">Gagal menyimpan ke riwayat percakapan. Coba lagi.</string>
     <string name="conversations_delete_error">Gagal menghapus percakapan. Coba lagi.</string>
     <string name="conversations_not_found">Percakapan tidak ditemukan.</string>
+    <string name="conversations_search_hint">Cari percakapan</string>
+    <string name="conversations_no_results_title">Tidak ada yang cocok</string>
+    <string name="conversations_no_results_body">Tidak ada percakapan yang cocok dengan pencarian.</string>
+    <string name="conversations_more_actions">Aksi lainnya</string>
+    <string name="conversations_rename">Ganti nama</string>
+    <string name="conversations_rename_title">Ganti nama percakapan</string>
+    <string name="conversations_rename_label">Judul</string>
+    <string name="conversations_rename_error">Tidak dapat mengganti nama percakapan. Coba lagi.</string>
     <!-- Prompts (templat system-prompt) -->
     <string name="prompts_title">Prompt</string>
     <string name="prompts_empty_title">Belum ada prompt</string>

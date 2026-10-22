@@ -8,10 +8,12 @@ import com.byokai.domain.model.ChatRole
 import com.byokai.domain.model.ProviderConfig
 import com.byokai.domain.model.ProviderId
 import com.byokai.domain.provider.ProviderError
+import com.byokai.ui.conversations.FakeConversationRepository
 import com.byokai.ui.providers.FakeCredentialStore
 import com.byokai.ui.providers.InMemoryConfigRepo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -69,6 +71,32 @@ class ChatViewModelTest {
         val vm = ChatViewModel(chatRepo, repo, store)
         advanceUntilIdle()
         return vm
+    }
+
+    /**
+     * ViewModel with a persisted conversation; returns the ViewModel,
+     * the fake repository, and the conversation id.
+     */
+    private suspend fun TestScope.persistentViewModel(
+        chatRepo: FakeChatRepository = FakeChatRepository(),
+    ): Triple<ChatViewModel, FakeConversationRepository, String> {
+        val repo = InMemoryConfigRepo(listOf(config()))
+        val store = FakeCredentialStore()
+        store.save("cfg-1", "sk-key")
+        val convRepo = FakeConversationRepository()
+        val vm = ChatViewModel(chatRepo, repo, store, convRepo)
+        advanceUntilIdle()
+        vm.newConversation("Test")
+        advanceUntilIdle()
+        val convId = vm.uiState.value.conversationId!!
+        return Triple(vm, convRepo, convId)
+    }
+
+    /** Sends [text] and settles; returns the persisted conversation id. */
+    private suspend fun TestScope.sendText(vm: ChatViewModel, text: String) {
+        vm.updateInput(text)
+        vm.send()!!.join()
+        advanceUntilIdle()
     }
 
     @Test
@@ -349,4 +377,175 @@ class ChatViewModelTest {
         vm.dismissError()
         assertNull(vm.uiState.value.error)
     }
+
+    @Test
+    fun `send assigns stable ids to persisted turns`() = runTest(testDispatcher) {
+        val chatRepo = FakeChatRepository(events = listOf(ChatEvent.Done("answer")))
+        val (vm, convRepo, convId) = persistentViewModel(chatRepo)
+
+        sendText(vm, "Hi")
+
+        val messages = vm.uiState.value.messages
+        assertEquals(2, messages.size)
+        assertNotNull(messages[0].id)
+        assertNotNull(messages[1].id)
+        val stored = convRepo.messages(convId).first()
+        assertEquals(messages.map { it.id }, stored.map { it.id })
+    }
+
+    @Test
+    fun `regenerate drops the last assistant message and streams a fresh one`() =
+        runTest(testDispatcher) {
+            val chatRepo = FakeChatRepository(events = listOf(ChatEvent.Done("first answer")))
+            val (vm, convRepo, convId) = persistentViewModel(chatRepo)
+            sendText(vm, "Hi")
+            assertEquals(2, vm.uiState.value.messages.size)
+
+            chatRepo.events = listOf(ChatEvent.Done("second answer"))
+            val last = vm.uiState.value.messages.last()
+            assertEquals(ChatRole.ASSISTANT, last.role)
+            vm.regenerate(last)!!.join()
+            advanceUntilIdle()
+
+            val messages = vm.uiState.value.messages
+            assertEquals(2, messages.size)
+            assertEquals("Hi", messages[0].text)
+            assertEquals("second answer", messages[1].text)
+            assertFalse(messages[1].isPending)
+            // The user turn is not duplicated in the resent history.
+            assertEquals(
+                listOf(ChatMessage(ChatRole.USER, "Hi")),
+                chatRepo.lastRequest!!.messages,
+            )
+            assertEquals(2, chatRepo.callCount)
+            // The database holds exactly the two current rows.
+            val stored = convRepo.messages(convId).first()
+            assertEquals(2, stored.size)
+            assertEquals("Hi", stored[0].content)
+            assertEquals("second answer", stored[1].content)
+            assertEquals(messages.map { it.id }, stored.map { it.id })
+        }
+
+    @Test
+    fun `regenerate is a no-op while generating`() = runTest(testDispatcher) {
+        val chatRepo = FakeChatRepository(hangForever = true)
+        val (vm, _, _) = persistentViewModel(chatRepo)
+        vm.updateInput("Hi")
+        vm.send()
+        advanceUntilIdle()
+
+        assertNull(vm.regenerate(vm.uiState.value.messages.last()))
+        assertEquals(1, chatRepo.callCount)
+    }
+
+    @Test
+    fun `regenerate refuses a non-trailing message`() = runTest(testDispatcher) {
+        val chatRepo = FakeChatRepository(events = listOf(ChatEvent.Done("a1")))
+        val (vm, _, _) = persistentViewModel(chatRepo)
+        // Empty conversation: nothing to regenerate.
+        assertNull(vm.regenerate(ChatUiMessage(ChatRole.USER, "x", false)))
+        sendText(vm, "Hi")
+        val firstUser = vm.uiState.value.messages.first()
+        // The user turn is not the trailing message: refused.
+        assertNull(vm.regenerate(firstUser))
+        assertEquals(1, chatRepo.callCount)
+    }
+
+    @Test
+    fun `editAndResend truncates from the edited message and sends new text`() =
+        runTest(testDispatcher) {
+            val chatRepo = FakeChatRepository(events = listOf(ChatEvent.Done("a1")))
+            val (vm, convRepo, convId) = persistentViewModel(chatRepo)
+            sendText(vm, "first")
+            chatRepo.events = listOf(ChatEvent.Done("a2"))
+            sendText(vm, "second")
+            assertEquals(4, vm.uiState.value.messages.size)
+
+            chatRepo.events = listOf(ChatEvent.Done("a-new"))
+            val firstUser = vm.uiState.value.messages[0]
+            vm.editAndResend(firstUser, "edited")!!.join()
+            advanceUntilIdle()
+
+            val messages = vm.uiState.value.messages
+            assertEquals(2, messages.size)
+            assertEquals("edited", messages[0].text)
+            assertEquals("a-new", messages[1].text)
+            assertFalse(messages[1].isPending)
+            // The resent history contains only the edited turn.
+            assertEquals(
+                listOf(ChatMessage(ChatRole.USER, "edited")),
+                chatRepo.lastRequest!!.messages,
+            )
+            assertEquals(3, chatRepo.callCount)
+            // The database was truncated transactionally: exactly the
+            // two new rows remain.
+            val stored = convRepo.messages(convId).first()
+            assertEquals(2, stored.size)
+            assertEquals("edited", stored[0].content)
+            assertEquals("a-new", stored[1].content)
+            assertEquals(messages.map { it.id }, stored.map { it.id })
+        }
+
+    @Test
+    fun `editAndResend with blank text is a no-op`() = runTest(testDispatcher) {
+        val chatRepo = FakeChatRepository(events = listOf(ChatEvent.Done("a1")))
+        val (vm, _, _) = persistentViewModel(chatRepo)
+        sendText(vm, "first")
+        val before = vm.uiState.value.messages
+
+        assertNull(vm.editAndResend(before[0], "   "))
+        advanceUntilIdle()
+
+        assertEquals(before, vm.uiState.value.messages)
+        assertEquals(1, chatRepo.callCount)
+    }
+
+    @Test
+    fun `editAndResend is a no-op while generating`() = runTest(testDispatcher) {
+        val chatRepo = FakeChatRepository(hangForever = true)
+        val (vm, _, _) = persistentViewModel(chatRepo)
+        vm.updateInput("Hi")
+        vm.send()
+        advanceUntilIdle()
+
+        val userMessage = vm.uiState.value.messages.first { it.role == ChatRole.USER }
+        assertNull(vm.editAndResend(userMessage, "edited"))
+        assertEquals(1, chatRepo.callCount)
+    }
+
+    @Test
+    fun `regenerate works in in-memory mode without persistence`() =
+        runTest(testDispatcher) {
+            val chatRepo = FakeChatRepository(events = listOf(ChatEvent.Done("one")))
+            val vm = readyViewModel(chatRepo)
+            sendText(vm, "Hi")
+
+            chatRepo.events = listOf(ChatEvent.Done("two"))
+            vm.regenerate(vm.uiState.value.messages.last())!!.join()
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf("Hi", "two"),
+                vm.uiState.value.messages.map { it.text },
+            )
+            assertEquals(2, chatRepo.callCount)
+        }
+
+    @Test
+    fun `editAndResend works in in-memory mode without persistence`() =
+        runTest(testDispatcher) {
+            val chatRepo = FakeChatRepository(events = listOf(ChatEvent.Done("one")))
+            val vm = readyViewModel(chatRepo)
+            sendText(vm, "Hi")
+
+            chatRepo.events = listOf(ChatEvent.Done("uno"))
+            vm.editAndResend(vm.uiState.value.messages.first(), "Hello")!!.join()
+            advanceUntilIdle()
+
+            assertEquals(
+                listOf("Hello", "uno"),
+                vm.uiState.value.messages.map { it.text },
+            )
+            assertEquals(2, chatRepo.callCount)
+        }
 }

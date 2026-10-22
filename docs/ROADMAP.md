@@ -191,7 +191,43 @@ adapters that reuse the first-party wire logic.
   live testing against real third-party endpoints needs the owner's own
   keys on their own device (manual checklist in the release report).
 
-## Phase 9 — Continuous improvement — NOT STARTED
+## Phase 9A — Chat parity — SHIPPED (0.9.0)
+
+Message-level actions and conversation management, closing the UX gap
+against flagship chat apps while keeping the Phase 5 streaming invariants.
+
+- **Regenerate response**: long-press the trailing assistant message →
+  **Regenerate**. Drops it from the database and UI, then streams a fresh
+  reply from the same history (the user turn is never duplicated).
+  Available only when idle; failed regenerations restore the previous
+  state exactly (Phase 5 semantics).
+- **Edit & resend**: long-press a user message → **Edit** opens an edit
+  dialog; saving replaces the message and deletes it plus every message
+  after it in one database transaction (no ordering gaps — ChatGPT
+  behavior), then sends the new text through the normal send pipeline.
+- **Message actions**: long-press any bubble for a context menu —
+  **Copy** (user and assistant, full text to clipboard), **Regenerate**
+  (trailing assistant only), **Edit** (user only). Inapplicable actions
+  are hidden; the menu is unavailable while streaming. Bubble rendering
+  is otherwise unchanged (device-tested).
+- **Conversation search**: a search field at the top of the history
+  screen filters by title or message content (case-insensitive), with a
+  dedicated no-results empty state.
+- **Conversation rename**: the history row's lone trash icon became an
+  overflow menu with **Rename** (pre-filled dialog; blank titles ignored,
+  failures surface an error and close the dialog) and **Delete**
+  (confirmation dialog unchanged from Phase 4).
+- New repository methods: `ConversationRepository.deleteMessagesFrom`
+  (transactional truncate from a message id) and
+  `ConversationRepository.searchConversations`; `ChatUiMessage` carries
+  the persisted row id so UI actions target the right rows.
+
+## Phase 9B/9C — Multimodal / power features — NOT STARTED
+
+- 9B (multimodal: image input, voice): not started.
+- 9C (power features: web search, artifacts, skills): not started.
+
+## Phase 9 (maintenance track) — ONGOING
 
 Issue triage, regression fixes, controlled dependency updates, periodic
 quality/security audits.

@@ -109,6 +109,12 @@
     <string name="chat_dismiss_error">Dismiss</string>
     <string name="chat_generating">Generating response…</string>
     <string name="chat_partial">Partial response — the stream was interrupted.</string>
+    <string name="chat_copy">Copy</string>
+    <string name="chat_regenerate">Regenerate</string>
+    <string name="chat_edit">Edit</string>
+    <string name="chat_save">Save</string>
+    <string name="chat_message_actions">Message actions</string>
+    <string name="chat_edit_message_title">Edit message</string>
 
     <!-- Conversations (history) -->
     <string name="conversations_title">Conversations</string>
@@ -124,6 +130,14 @@
     <string name="conversations_save_error">Could not save to conversation history. Please try again.</string>
     <string name="conversations_delete_error">Could not delete the conversation. Please try again.</string>
     <string name="conversations_not_found">Conversation not found.</string>
+    <string name="conversations_search_hint">Search conversations</string>
+    <string name="conversations_no_results_title">No matches</string>
+    <string name="conversations_no_results_body">No conversations match your search.</string>
+    <string name="conversations_more_actions">More actions</string>
+    <string name="conversations_rename">Rename</string>
+    <string name="conversations_rename_title">Rename conversation</string>
+    <string name="conversations_rename_label">Title</string>
+    <string name="conversations_rename_error">Could not rename the conversation. Please try again.</string>
     <!-- Prompts (system-prompt templates) -->
     <string name="prompts_title">Prompts</string>
     <string name="prompts_empty_title">No prompts yet</string>

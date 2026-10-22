@@ -18,13 +18,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -35,7 +41,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -99,6 +107,9 @@ fun ConversationsScreen(
     val pendingDelete = uiState.pendingDeleteId?.let { id ->
         uiState.conversations.firstOrNull { it.id == id }
     }
+    val pendingRename = uiState.pendingRenameId?.let { id ->
+        uiState.conversations.firstOrNull { it.id == id }
+    }
 
     Scaffold(
         topBar = {
@@ -158,19 +169,79 @@ fun ConversationsScreen(
                 )
             }
 
-            else -> LazyColumn(
+            else -> Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(uiState.conversations, key = { it.id }) { conversation ->
-                    ConversationRow(
-                        conversation = conversation,
-                        onOpen = { onOpenConversation(conversation.id) },
-                        onDelete = { viewModel.requestDelete(conversation.id) },
+                // The search field stays visible while a query is active
+                // (so it can be cleared); with no conversations and no
+                // query the plain empty state is enough.
+                if (uiState.conversations.isNotEmpty() || uiState.searchQuery.isNotBlank()) {
+                    OutlinedTextField(
+                        value = uiState.searchQuery,
+                        onValueChange = viewModel::updateSearchQuery,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        placeholder = { Text(stringResource(R.string.conversations_search_hint)) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Search,
+                                contentDescription = null,
+                            )
+                        },
+                        singleLine = true,
                     )
+                }
+                if (uiState.conversations.isEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = stringResource(
+                                if (uiState.searchQuery.isBlank()) {
+                                    R.string.conversations_empty_title
+                                } else {
+                                    R.string.conversations_no_results_title
+                                },
+                            ),
+                            style = MaterialTheme.typography.titleLarge,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(
+                                if (uiState.searchQuery.isBlank()) {
+                                    R.string.conversations_empty_body
+                                } else {
+                                    R.string.conversations_no_results_body
+                                },
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(uiState.conversations, key = { it.id }) { conversation ->
+                            ConversationRow(
+                                conversation = conversation,
+                                onOpen = { onOpenConversation(conversation.id) },
+                                onRename = { viewModel.requestRename(conversation.id) },
+                                onDelete = { viewModel.requestDelete(conversation.id) },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -203,15 +274,25 @@ fun ConversationsScreen(
             },
         )
     }
+
+    if (pendingRename != null) {
+        RenameConversationDialog(
+            currentTitle = pendingRename.title,
+            onDismiss = viewModel::cancelRename,
+            onConfirm = viewModel::confirmRename,
+        )
+    }
 }
 
 @Composable
 private fun ConversationRow(
     conversation: Conversation,
     onOpen: () -> Unit,
+    onRename: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     Surface(
         onClick = onOpen,
         modifier = modifier.fillMaxWidth(),
@@ -236,14 +317,92 @@ private fun ConversationRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.conversations_delete),
-                )
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = stringResource(R.string.conversations_more_actions),
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.conversations_rename)) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Edit,
+                                contentDescription = null,
+                            )
+                        },
+                        onClick = {
+                            onRename()
+                            menuExpanded = false
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(R.string.conversations_delete),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        },
+                        onClick = {
+                            onDelete()
+                            menuExpanded = false
+                        },
+                    )
+                }
             }
         }
     }
+}
+
+/**
+ * Rename dialog: pre-filled with the current title, following the
+ * delete-confirmation request/cancel/confirm shape.
+ */
+@Composable
+private fun RenameConversationDialog(
+    currentTitle: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var title by remember(currentTitle) { mutableStateOf(currentTitle) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.conversations_rename_title)) },
+        text = {
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text(stringResource(R.string.conversations_rename_label)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(title) },
+                enabled = title.isNotBlank(),
+            ) {
+                Text(stringResource(R.string.chat_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.conversations_cancel))
+            }
+        },
+    )
 }
 
 /**

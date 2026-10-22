@@ -11,6 +11,7 @@ import com.byokai.domain.chat.ChatRepository
 import com.byokai.domain.chat.ChatRequest
 import com.byokai.domain.model.ChatMessage
 import com.byokai.domain.model.ChatRole
+import com.byokai.domain.model.Message
 import com.byokai.domain.model.PromptTemplate
 import com.byokai.domain.model.ProviderConfig
 import com.byokai.domain.repository.ConversationRepository
@@ -33,6 +34,10 @@ import kotlinx.coroutines.launch
 /**
  * One visible chat turn.
  *
+ * @property id the persisted [com.byokai.domain.model.Message.id] when
+ * this turn is stored in history, null for turns not yet persisted
+ * (the in-flight assistant turn, or every turn in in-memory mode).
+ * Used to target message actions (regenerate, edit) at the right row.
  * @property isPending true while the turn is still streaming (or was
  * interrupted by an error / stop); false once the terminal [ChatEvent]
  * for it has been processed.
@@ -41,6 +46,7 @@ data class ChatUiMessage(
     val role: ChatRole,
     val text: String,
     val isPending: Boolean,
+    val id: String? = null,
 )
 
 /**
@@ -279,6 +285,7 @@ class ChatViewModel(
                             role = message.role,
                             text = message.content,
                             isPending = message.isPartial,
+                            id = message.id,
                         )
                     },
                 )
@@ -402,10 +409,7 @@ class ChatViewModel(
      * [ChatUiState.canSend]): a second call — e.g. a fast double tap —
      * cannot slip through before the coroutine starts, so the user turn
      * is persisted exactly once and only one stream starts. A failed
-     * claim returns null. With an active conversation the user turn is
-     * persisted before the stream starts, and the conversation is
-     * created first when needed; a failed write aborts the send with an
-     * error banner and releases the claim.
+     * claim returns null. The shared [sendPipeline] does the actual work.
      *
      * Returns the launched [Job]. Joining it waits until persistence is
      * done and the stream has STARTED — not until the stream completes;
@@ -415,46 +419,204 @@ class ChatViewModel(
     fun send(): Job? {
         val userText = _uiState.value.input.trim()
         if (userText.isBlank()) return null
+        if (!claimSend()) return null
+        _uiState.update { it.copy(input = "") }
+        return viewModelScope.launch { sendPipeline(userText) }
+    }
+
+    /**
+     * Synchronously claims a full send (compare-and-set on
+     * [ChatUiState.canSend] — keyed config, model, non-blank input, and
+     * no in-flight stream). Used by [send]; a failed claim returns
+     * false and the caller must do nothing (Fase 5 invariant).
+     */
+    private fun claimSend(): Boolean {
         var claimed = false
         _uiState.update { state ->
             if (state.canSend) {
                 claimed = true
-                state.copy(input = "", generating = true)
+                state.copy(generating = true)
             } else {
                 state
             }
         }
-        if (!claimed) return null
+        return claimed
+    }
+
+    /**
+     * Synchronously claims the generation slot (compare-and-set on
+     * [ChatUiState.generating]). Returns false when a stream is already
+     * running — the caller must do nothing. Every entry point that
+     * starts a stream ([retry], [regenerate], [editAndResend]) claims
+     * first ([send] claims via [claimSend]), so two triggers can never
+     * start two streams for one action (Fase 5 invariant).
+     */
+    private fun claimGeneration(): Boolean {
+        var claimed = false
+        _uiState.update { state ->
+            if (!state.generating) {
+                claimed = true
+                state.copy(generating = true)
+            } else {
+                state
+            }
+        }
+        return claimed
+    }
+
+    /**
+     * The shared send body: join any in-flight partial persist (Fase 5
+     * ordering), ensure/persist the user turn, then stream. The caller
+     * must have claimed the generation slot and prepared
+     * [ChatUiState.messages] (fresh input for [send], truncated history
+     * for [editAndResend]).
+     */
+    private suspend fun sendPipeline(userText: String) {
+        // A stop() immediately before this send may still be
+        // persisting its partial turn; wait for it so the database
+        // keeps turn order (partial before the new user turn).
+        partialPersistJob?.join()
+        partialPersistJob = null
+        val repository = conversationRepository
+        val conversationId = if (repository == null) {
+            null // In-memory mode: no persistence.
+        } else {
+            ensureConversation() ?: run {
+                _uiState.update { it.copy(generating = false) }
+                return
+            }
+        }
+        val persisted = if (conversationId != null) {
+            when (val result = persistUserMessage(conversationId, userText)) {
+                is Result.Success -> result.data
+                is Result.Error -> {
+                    _uiState.update { it.copy(generating = false) }
+                    return
+                }
+                // Repository writes never return Loading; defensive.
+                is Result.Loading -> return
+            }
+        } else {
+            null
+        }
+        if (conversationId != null) {
+            renameFromFirstMessage(conversationId, userText)
+        }
+        _uiState.update {
+            it.copy(
+                messages = it.messages +
+                    ChatUiMessage(
+                        ChatRole.USER,
+                        userText,
+                        isPending = false,
+                        id = persisted?.id,
+                    ),
+            )
+        }
+        startStream(_uiState.value.messages)
+    }
+
+    /**
+     * Regenerates the trailing assistant turn: deletes it from history
+     * and the screen, then streams a fresh response for the same
+     * history. The user turn is NOT duplicated — it was persisted by
+     * the original send and stays in history.
+     *
+     * Only the last message can be regenerated, only while idle, and
+     * only when it is an assistant turn. A failed stream keeps its
+     * partial text marked pending (see [retry] for that path).
+     */
+    fun regenerate(message: ChatUiMessage): Job? {
+        val state = _uiState.value
+        if (state.generating) return null
+        val last = state.messages.lastOrNull() ?: return null
+        if (last.role != ChatRole.ASSISTANT) return null
+        if (!isSameUiMessage(last, message)) return null
+        if (!claimGeneration()) return null
         return viewModelScope.launch {
-            // A stop() immediately before this send may still be
-            // persisting its partial turn; wait for it so the database
-            // keeps turn order (partial before the new user turn).
             partialPersistJob?.join()
             partialPersistJob = null
             val repository = conversationRepository
-            val conversationId = if (repository == null) {
-                null // In-memory mode: no persistence.
-            } else {
-                ensureConversation() ?: run {
-                    _uiState.update { it.copy(generating = false) }
+            val conversationId = state.conversationId
+            if (repository != null && conversationId != null && last.id != null) {
+                if (repository.deleteMessagesFrom(conversationId, last.id)
+                    is Result.Error
+                ) {
+                    _uiState.update {
+                        it.copy(
+                            generating = false,
+                            error = UiText.Res(R.string.conversations_save_error),
+                        )
+                    }
                     return@launch
                 }
             }
-            if (conversationId != null && !persistUserMessage(conversationId, userText)) {
+            val truncated = _uiState.value.messages.dropLast(1)
+            _uiState.update { it.copy(messages = truncated) }
+            startStream(truncated) ?: run {
                 _uiState.update { it.copy(generating = false) }
-                return@launch
             }
-            if (conversationId != null) {
-                renameFromFirstMessage(conversationId, userText)
-            }
-            _uiState.update {
-                it.copy(
-                    messages = it.messages +
-                        ChatUiMessage(ChatRole.USER, userText, isPending = false),
-                )
-            }
-            startStream(_uiState.value.messages)
         }
+    }
+
+    /**
+     * Edits a user message: deletes it and every message after it from
+     * history and the screen (single transaction in the repository —
+     * never a partial truncation), then sends [newText] as a fresh
+     * user turn through the normal [sendPipeline].
+     *
+     * Only while idle; blank text is a no-op.
+     */
+    fun editAndResend(message: ChatUiMessage, newText: String): Job? {
+        val text = newText.trim()
+        if (text.isBlank()) return null
+        val state = _uiState.value
+        if (state.generating) return null
+        if (message.role != ChatRole.USER) return null
+        val index = indexOfUiMessage(state.messages, message)
+        if (index < 0) return null
+        if (!claimGeneration()) return null
+        return viewModelScope.launch {
+            partialPersistJob?.join()
+            partialPersistJob = null
+            val repository = conversationRepository
+            val conversationId = state.conversationId
+            if (repository != null && conversationId != null && message.id != null) {
+                if (repository.deleteMessagesFrom(conversationId, message.id)
+                    is Result.Error
+                ) {
+                    _uiState.update {
+                        it.copy(
+                            generating = false,
+                            error = UiText.Res(R.string.conversations_save_error),
+                        )
+                    }
+                    return@launch
+                }
+            }
+            _uiState.update { it.copy(messages = it.messages.take(index)) }
+            sendPipeline(text)
+        }
+    }
+
+    /**
+     * Matches a [ChatUiMessage] against the current list: by stable
+     * [ChatUiMessage.id] when present, by data-class equality otherwise
+     * (in-memory mode, where nothing is persisted).
+     */
+    private fun isSameUiMessage(a: ChatUiMessage, b: ChatUiMessage): Boolean =
+        if (a.id != null && b.id != null) a.id == b.id else a == b
+
+    /** Index of [message] in [messages], or -1 when absent. */
+    private fun indexOfUiMessage(
+        messages: List<ChatUiMessage>,
+        message: ChatUiMessage,
+    ): Int {
+        if (message.id != null) {
+            val byId = messages.indexOfFirst { it.id == message.id }
+            if (byId >= 0) return byId
+        }
+        return messages.indexOf(message)
     }
 
     /**
@@ -468,13 +630,18 @@ class ChatViewModel(
      * the retry appends a new row rather than rewriting history.
      */
     fun retry(): Job? {
-        val state = _uiState.value
-        if (state.generating) return null
-        val trimmed = state.messages.dropLastWhile {
+        if (!claimGeneration()) return null
+        val trimmed = _uiState.value.messages.dropLastWhile {
             it.role == ChatRole.ASSISTANT && it.isPending
         }
-        if (trimmed.none { it.role == ChatRole.USER }) return null
-        return startStream(trimmed)
+        if (trimmed.none { it.role == ChatRole.USER }) {
+            _uiState.update { it.copy(generating = false) }
+            return null
+        }
+        return startStream(trimmed) ?: run {
+            _uiState.update { it.copy(generating = false) }
+            null
+        }
     }
 
     /**
@@ -537,29 +704,35 @@ class ChatViewModel(
     }
 
     /**
-     * Persists the user turn. Returns false when the write failed (the
-     * error banner is set); the caller must abort the send so the UI
-     * never shows a turn that is not in history.
+     * Persists the user turn. Returns the stored row on success; a
+     * failed write sets the error banner and returns [Result.Error] so
+     * the caller aborts the send — the UI never shows a turn that is
+     * not in history.
      */
-    private suspend fun persistUserMessage(conversationId: String, userText: String): Boolean {
-        val repository = conversationRepository ?: return true
+    private suspend fun persistUserMessage(
+        conversationId: String,
+        userText: String,
+    ): Result<Message> {
+        val repository = conversationRepository ?: return Result.Error(
+            IllegalStateException("no conversation repository"),
+        )
         return when (
-            repository.appendMessage(
+            val result = repository.appendMessage(
                 conversationId,
                 ChatRole.USER,
                 userText,
                 isPartial = false,
             )
         ) {
-            is Result.Success -> true
+            is Result.Success -> result
             is Result.Error -> {
                 _uiState.update {
                     it.copy(error = UiText.Res(R.string.conversations_save_error))
                 }
-                false
+                result
             }
             // Repository writes never return Loading; defensive.
-            is Result.Loading -> false
+            is Result.Loading -> result
         }
     }
 
@@ -596,15 +769,31 @@ class ChatViewModel(
             ?.text.orEmpty()
         if (partial.isEmpty()) return null
         return viewModelScope.launch {
-            if (repository.appendMessage(
+            val persistedId = when (
+                val result = repository.appendMessage(
                     conversationId,
                     ChatRole.ASSISTANT,
                     partial,
                     isPartial = true,
-                ) is Result.Error
+                )
             ) {
-                _uiState.update {
-                    it.copy(error = UiText.Res(R.string.conversations_save_error))
+                is Result.Success -> result.data.id
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(error = UiText.Res(R.string.conversations_save_error))
+                    }
+                    null
+                }
+                // Repository writes never return Loading; defensive.
+                is Result.Loading -> null
+            }
+            if (persistedId != null) {
+                _uiState.update { state ->
+                    state.copy(
+                        messages = updatePendingAssistant(state.messages) {
+                            it.copy(id = persistedId)
+                        },
+                    )
                 }
             }
         }
@@ -677,23 +866,37 @@ class ChatViewModel(
     private suspend fun finalizeAssistant(fullText: String) {
         val conversationId = _uiState.value.conversationId
         val repository = conversationRepository
-        if (conversationId != null && repository != null) {
-            if (repository.appendMessage(
-                    conversationId,
-                    ChatRole.ASSISTANT,
-                    fullText,
-                    isPartial = false,
-                ) is Result.Error
-            ) {
-                _uiState.update {
-                    it.copy(error = UiText.Res(R.string.conversations_save_error))
+        val persistedId: String? =
+            if (conversationId != null && repository != null) {
+                when (
+                    val result = repository.appendMessage(
+                        conversationId,
+                        ChatRole.ASSISTANT,
+                        fullText,
+                        isPartial = false,
+                    )
+                ) {
+                    is Result.Success -> result.data.id
+                    is Result.Error -> {
+                        _uiState.update {
+                            it.copy(error = UiText.Res(R.string.conversations_save_error))
+                        }
+                        null
+                    }
+                    // Repository writes never return Loading; defensive.
+                    is Result.Loading -> null
                 }
+            } else {
+                null
             }
-        }
         _uiState.update { state ->
             state.copy(
                 messages = updatePendingAssistant(state.messages) {
-                    it.copy(text = fullText, isPending = false)
+                    it.copy(
+                        text = fullText,
+                        isPending = false,
+                        id = persistedId ?: it.id,
+                    )
                 },
                 generating = false,
             )
@@ -714,12 +917,26 @@ class ChatViewModel(
             .lastOrNull { it.role == ChatRole.ASSISTANT && it.isPending }
             ?.text.orEmpty()
         if (conversationId != null && repository != null && partial.isNotEmpty()) {
-            repository.appendMessage(
-                conversationId,
-                ChatRole.ASSISTANT,
-                partial,
-                isPartial = true,
-            )
+            val persistedId = when (
+                val result = repository.appendMessage(
+                    conversationId,
+                    ChatRole.ASSISTANT,
+                    partial,
+                    isPartial = true,
+                )
+            ) {
+                is Result.Success -> result.data.id
+                else -> null
+            }
+            if (persistedId != null) {
+                _uiState.update { state ->
+                    state.copy(
+                        messages = updatePendingAssistant(state.messages) {
+                            it.copy(id = persistedId)
+                        },
+                    )
+                }
+            }
         }
         _uiState.update { state ->
             state.copy(error = event.error.userMessage(), generating = false)

@@ -64,6 +64,28 @@ interface ConversationRepository {
     ): Result<Message>
 
     /**
+     * Deletes the message with [messageId] and every message stored
+     * after it in [conversationId], in a single transaction, and bumps
+     * the conversation's `updatedAt`. Ordering follows insertion order
+     * (the same order [messages] returns). A no-op when [messageId]
+     * does not exist.
+     *
+     * Used by edit-and-resend (truncate from the edited user message)
+     * and regenerate (truncate from the last assistant message).
+     */
+    suspend fun deleteMessagesFrom(
+        conversationId: String,
+        messageId: String,
+    ): Result<Unit>
+
+    /**
+     * Conversations whose title or any message content contains [query]
+     * (case-insensitive substring match), ordered by `updatedAt`
+     * descending. A blank [query] behaves like [conversations].
+     */
+    fun searchConversations(query: String): Flow<List<Conversation>>
+
+    /**
      * Marks a message complete (`is_partial = 0`).
      *
      * Reserved for flows that persist a partial row first and complete it

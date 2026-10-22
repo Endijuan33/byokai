@@ -8,6 +8,7 @@ import com.byokai.domain.repository.ConversationRepository
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
 /**
@@ -135,6 +136,40 @@ class FakeConversationRepository : ConversationRepository {
             }
         }
         return Result.Success(Unit)
+    }
+
+    override suspend fun deleteMessagesFrom(
+        conversationId: String,
+        messageId: String,
+    ): Result<Unit> {
+        if (failWrites) return Result.Error(RuntimeException("simulated IO failure"))
+        val list = messages[conversationId] ?: return Result.Success(Unit)
+        val target = list.indexOfFirst { it.id == messageId }
+        if (target < 0) return Result.Success(Unit)
+        // Mirror the real contract: the target row and every row stored
+        // after it (createdAt ordering == list order here) are removed.
+        val removed = list.subList(target, list.size).toList()
+        list.subList(target, list.size).clear()
+        messageFlows[conversationId]?.update { current ->
+            current.filter { kept -> removed.none { it.id == kept.id } }
+        }
+        conversations[conversationId]?.let {
+            conversations[conversationId] = it.copy(updatedAt = tick())
+            emitConversations()
+        }
+        return Result.Success(Unit)
+    }
+
+    override fun searchConversations(query: String): Flow<List<Conversation>> {
+        if (query.isBlank()) return conversations()
+        val q = query.lowercase()
+        return conversationsFlow.map { all ->
+            all.filter { conversation ->
+                conversation.title.lowercase().contains(q) ||
+                    messages[conversation.id].orEmpty()
+                        .any { it.content.lowercase().contains(q) }
+            }
+        }
     }
 
     private fun emitConversations() {

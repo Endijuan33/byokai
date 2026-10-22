@@ -1,5 +1,8 @@
 package com.byokai.ui.chat
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,10 +23,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -47,9 +55,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -103,6 +113,8 @@ fun ChatScreen(
     val selectedConfig = uiState.configs.firstOrNull { it.id == uiState.selectedConfigId }
     val anyKeyReady = uiState.configs.any { uiState.keyReady[it.id] == true }
     val defaultTitle = stringResource(R.string.conversations_new)
+    /** The user message currently being edited, or null. */
+    var editingMessage by remember { mutableStateOf<ChatUiMessage?>(null) }
 
     LaunchedEffect(conversationId) {
         if (conversationId != null) {
@@ -195,6 +207,8 @@ fun ChatScreen(
                     MessageList(
                         messages = uiState.messages,
                         generating = uiState.generating,
+                        onRegenerate = viewModel::regenerate,
+                        onEdit = { editingMessage = it },
                         modifier = Modifier.weight(1f),
                     )
 
@@ -222,6 +236,18 @@ fun ChatScreen(
             currentSystemPrompt = uiState.systemPrompt,
             onDismiss = viewModel::closeSystemPromptDialog,
             onSave = viewModel::setSystemPrompt,
+        )
+    }
+
+    val messageToEdit = editingMessage
+    if (messageToEdit != null) {
+        EditMessageDialog(
+            initialText = messageToEdit.text,
+            onDismiss = { editingMessage = null },
+            onSave = { newText ->
+                viewModel.editAndResend(messageToEdit, newText)
+                editingMessage = null
+            },
         )
     }
 }
@@ -428,6 +454,8 @@ private fun ErrorBanner(
 private fun MessageList(
     messages: List<ChatUiMessage>,
     generating: Boolean,
+    onRegenerate: (ChatUiMessage) -> Unit,
+    onEdit: (ChatUiMessage) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -447,78 +475,196 @@ private fun MessageList(
             MessageBubble(
                 message = message,
                 showGenerating = message.isPending && generating,
+                isLastMessage = index == messages.lastIndex,
+                actionsEnabled = !generating,
+                onRegenerate = { onRegenerate(message) },
+                onEdit = { onEdit(message) },
             )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageBubble(
     message: ChatUiMessage,
     showGenerating: Boolean,
+    isLastMessage: Boolean,
+    actionsEnabled: Boolean,
+    onRegenerate: () -> Unit,
+    onEdit: () -> Unit,
 ) {
     val isUser = message.role == ChatRole.USER
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
-    ) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = if (isUser) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerHigh
-            },
-            tonalElevation = 1.dp,
+    val clipboardManager = LocalClipboardManager.current
+    var menuExpanded by remember { mutableStateOf(false) }
+    // Long-press actions, mirroring flagship chat apps. Regenerate is
+    // only offered on the trailing assistant turn (the only one it can
+    // meaningfully replace); edit only on user turns. While a stream
+    // is running only Copy stays available.
+    val showCopy = message.text.isNotBlank()
+    val showRegenerate = !isUser && isLastMessage && actionsEnabled
+    val showEdit = isUser && actionsEnabled
+    val hasActions = showCopy || showRegenerate || showEdit
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                    onLongClickLabel = stringResource(R.string.chat_message_actions),
+                    onLongClick = { if (hasActions) menuExpanded = true },
+                ),
+            horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                if (message.text.isNotEmpty()) {
-                    if (isUser) {
-                        Text(
-                            text = message.text,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                    } else {
-                        // Read the ambient (platform) handler OUTSIDE the
-                        // provider override below: AssistantMarkdownText
-                        // replaces LocalUriHandler internally with the
-                        // safe variant, which calls back here only after
-                        // the URL passed LinkSafety.
-                        val platformUriHandler = LocalUriHandler.current
-                        AssistantMarkdownText(
-                            text = message.text,
-                            onLinkClick = { url -> platformUriHandler.openUri(url) },
-                        )
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = if (isUser) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+                tonalElevation = 1.dp,
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    if (message.text.isNotEmpty()) {
+                        if (isUser) {
+                            Text(
+                                text = message.text,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                        } else {
+                            // Read the ambient (platform) handler OUTSIDE the
+                            // provider override below: AssistantMarkdownText
+                            // replaces LocalUriHandler internally with the
+                            // safe variant, which calls back here only after
+                            // the URL passed LinkSafety.
+                            val platformUriHandler = LocalUriHandler.current
+                            AssistantMarkdownText(
+                                text = message.text,
+                                onLinkClick = { url -> platformUriHandler.openUri(url) },
+                            )
+                        }
                     }
-                }
-                if (showGenerating && message.text.isEmpty()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                    if (showGenerating && message.text.isEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.chat_generating),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (message.isPending && !showGenerating &&
+                        message.role == ChatRole.ASSISTANT && message.text.isNotEmpty()
+                    ) {
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = stringResource(R.string.chat_generating),
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = stringResource(R.string.chat_partial),
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
-                if (message.isPending && !showGenerating &&
-                    message.role == ChatRole.ASSISTANT && message.text.isNotEmpty()
-                ) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(R.string.chat_partial),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+            }
+        }
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+        ) {
+            if (showCopy) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.chat_copy)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.ContentCopy,
+                            contentDescription = null,
+                        )
+                    },
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(message.text))
+                        menuExpanded = false
+                    },
+                )
+            }
+            if (showRegenerate) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.chat_regenerate)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = null,
+                        )
+                    },
+                    onClick = {
+                        onRegenerate()
+                        menuExpanded = false
+                    },
+                )
+            }
+            if (showEdit) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.chat_edit)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Edit,
+                            contentDescription = null,
+                        )
+                    },
+                    onClick = {
+                        onEdit()
+                        menuExpanded = false
+                    },
+                )
             }
         }
     }
+}
+
+/**
+ * Dialog for editing a user message. Saving truncates the message and
+ * everything after it, then resends the new text (see
+ * [ChatViewModel.editAndResend]).
+ */
+@Composable
+private fun EditMessageDialog(
+    initialText: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var text by remember(initialText) { mutableStateOf(initialText) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.chat_edit_message_title)) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier.fillMaxWidth(),
+                maxLines = 8,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(text) },
+                enabled = text.isNotBlank(),
+            ) {
+                Text(stringResource(R.string.chat_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.conversations_cancel))
+            }
+        },
+    )
 }
 
 @Composable

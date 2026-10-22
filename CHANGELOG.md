@@ -3,6 +3,41 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.9.0] — 2026-10-22
+
+Phase 9A "Chat parity": message-level actions and conversation management.
+
+### Added
+
+- Regenerate response: long-press the trailing assistant message and choose
+  **Regenerate** to drop it from the database and UI and stream a fresh
+  reply from the same history (the user turn is never duplicated). Disabled
+  while a stream is in flight; failed regenerations restore the previous
+  state exactly as in Phase 5.
+- Edit & resend: long-press a user message and choose **Edit** to open an
+  edit dialog; saving replaces the message and deletes every message after
+  it (transactional, no ordering gaps — like ChatGPT) before sending the new
+  text through the normal send pipeline.
+- Message actions: long-press any bubble for a context menu — **Copy** (user
+  and assistant, copies the full message text), **Regenerate** (trailing
+  assistant only), **Edit** (user messages only). Actions that do not apply
+  are hidden; the menu is unavailable while a response is streaming.
+- Conversation search: a search field at the top of the history screen
+  filters by title or message content (case-insensitive), with a dedicated
+  no-results empty state.
+- Conversation rename: per-row overflow menu (replacing the lone trash icon)
+  with **Rename** (pre-filled dialog; blank titles are ignored) and **Delete**
+  (unchanged confirmation dialog).
+
+### Fixed
+
+- N/A (no regressions fixed in this release).
+
+### Security
+
+- No changes: edit/regenerate operate on the local conversation database
+  only; no API keys, credentials, or network behavior are touched.
+
 ## [0.8.1] — 2026-10-22
 
 Bugfix: base-URL path convention (OpenAI SDK style).

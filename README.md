@@ -10,15 +10,15 @@ AI, Mistral AI, Perplexity, Ollama, LM Studio) served through generic
 OpenAI-compatible and Anthropic-compatible adapters — all with streaming
 chat, conversation history, prompt templates, and import/export.
 
-> **Project status: Phase 8 — Provider expansion (in progress, 0.8.0).**
+> **Project status: Phase 9A — Chat parity (in progress, 0.9.0).**
 > The app builds, runs on-device, and is validated by CI (unit tests, lint
 > green, R8 release pipeline validated) and by device testing on the owner's
 > own phone (Phases 4–6 manual checklists passed; Gemini tested live with
-> the owner's key). A signed release (v0.7.0) is published on GitHub
-> Releases. See [docs/ROADMAP.md](docs/ROADMAP.md) for the honest
-> status of every phase.
+> the owner's key; Groq live test passed with v0.8.1). A signed release
+> (v0.7.0) is published on GitHub Releases. See
+> [docs/ROADMAP.md](docs/ROADMAP.md) for the honest status of every phase.
 
-## Features (current, 0.8.0)
+## Features (current, 0.9.0)
 
 - **Multi-provider BYOK chat**: OpenAI (Chat Completions SSE), Anthropic
   (Messages API), Gemini (`streamGenerateContent`) — each with its own auth
@@ -33,6 +33,11 @@ chat, conversation history, prompt templates, and import/export.
 - **Streaming chat UI**: live message bubbles with Markdown rendering
   (code blocks with copy buttons, safe link taps), Stop while generating,
   error banner with Retry
+- **Message actions**: long-press a bubble — Copy (full text), Regenerate
+  (trailing assistant message, disabled while streaming), Edit & resend
+  (user messages; truncates the thread from the edited message)
+- **Conversation management**: search by title or message content,
+  rename, delete with confirmation (history screen)
 - **Provider management**: add/edit/delete configs, save and test API keys;
   typed keystrokes never linger in ViewModel state
 - **Encrypted credential storage**: API keys encrypted at rest with Tink
