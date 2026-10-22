@@ -1,7 +1,8 @@
-# Providers (Phase 3, current 0.6.0)
+# Providers (Phase 3, current 0.8.0)
 
 This document describes the provider system **as implemented** (Phase 3,
-milestones 3A–3E; extended by reliability fixes in Phase 5). The contract is
+milestones 3A–3E; extended by reliability fixes in Phase 5 and the
+provider catalog + generic adapters in Phase 8). The contract is
 `domain.provider.AiProvider` (`providerId`, `displayName`, `defaultBaseUrl`,
 `capabilities`, `listModels`, `testConnection`, `streamChat`); each adapter
 owns its auth scheme, message format, streaming protocol, and error mapping —
@@ -9,9 +10,9 @@ never assume providers share any of these.
 
 > **Device-test status (2026-10-22).** The Gemini adapter has been tested
 > live on the owner's device with the owner's own key
-> (`gemini-3.6-flash`). OpenAI and Anthropic are validated against
-> MockWebServer fixtures only. No real keys or live endpoints are ever
-> used in CI or in this repository.
+> (`gemini-3.6-flash`). OpenAI, Anthropic, and both generic adapters are
+> validated against MockWebServer fixtures only. No real keys or live
+> endpoints are ever used in CI or in this repository.
 
 Adapters in `AppContainer.providerRegistry` (all share one
 `OkHttpClient` from `core.network.HttpClientFactory`, `Dispatchers.IO`
@@ -20,6 +21,8 @@ for streaming):
 - `OpenAiAdapter` — OpenAI Chat Completions API
 - `AnthropicAdapter` — Anthropic Messages API
 - `GeminiAdapter` — Google Gemini Generative Language API
+- `OpenAiCompatibleAdapter` — any third-party OpenAI-compatible endpoint
+- `AnthropicCompatibleAdapter` — any third-party Anthropic-compatible endpoint
 
 The shared core (`core.network`) every adapter uses:
 
@@ -81,17 +84,65 @@ API key** — keys live only in the `CredentialStore` keyed by config id.
 - **testConnection**: cheap `GET {baseUrl}/v1/models` — no model call,
   so no quota burn beyond the listing call itself.
 
-## OpenAI-compatible endpoints
+## Provider catalog (Phase 8)
 
-Served by `OpenAiAdapter` with a user-supplied `baseUrl` — the wire
-protocol is the OpenAI shape above, so any compatible server works. The
-base URL is re-validated by `EndpointValidator` **on every call** (HTTPS
-required; cleartext HTTP only for loopback hosts
-`127.0.0.1`/`::1`/`localhost`, flagged with a UI-visible warning;
-embedded credentials (`user@host`) rejected; the cloud metadata address
-`169.254.169.254` rejected). Custom servers are expected to implement
-`GET /v1/models` for listing and connection testing; `data: [DONE]`
-must terminate the stream.
+The add-provider flow starts from a searchable, **bundled** catalog
+(`domain.provider.ProviderCatalog`) — 13 curated entries: OpenAI,
+Anthropic, Google Gemini, DeepSeek, xAI, OpenRouter, Groq, Together AI,
+Fireworks AI, Mistral AI, Perplexity, Ollama, LM Studio.
+
+- The catalog ships **inside the app** — no network fetch, works
+  offline, and the list can never be tampered with in transit.
+- Each entry carries: unique id, display name, adapter family, default
+  base URL, suggested models, website.
+- Selecting an entry only **pre-fills** the editor (name, base URL,
+  family, suggested models); every field stays editable before saving.
+- The search field filters by name (case-insensitive); a "Custom
+  provider" section covers endpoints not in the list, with an explicit
+  note that **the API key will be sent to the chosen endpoint** — only
+  use endpoints you trust.
+- **Suggested models are suggestions, not verified data.** Model ids
+  change over time; the UI labels them "suggested", and endpoints that
+  implement model listing can refresh the real list after saving (the
+  "Refresh models" button in the editor).
+
+Inclusion rule: an entry is listed only when its base URL and protocol
+are known with confidence. Local servers (Ollama, LM Studio) use
+cleartext loopback URLs, which `EndpointValidator` allows with a
+UI-visible warning.
+
+## Generic adapters (Phase 8)
+
+Instead of one bespoke adapter per third-party provider, two generic
+adapters reuse the first-party wire implementations:
+
+- **`OpenAiCompatibleAdapter`** (`ProviderId.OPENAI_COMPATIBLE`)
+  subclasses `OpenAiAdapter`: identical SSE streaming, error envelopes,
+  retries, and per-call `EndpointValidator` checks. No fixed base URL —
+  the user picks one from the catalog or types a custom endpoint.
+  **Model listing is best-effort**: endpoints that do not implement
+  `GET /v1/models` (HTTP 404, or a body that is not the OpenAI
+  envelope) fall back to the config's manually entered model ids
+  instead of failing. Auth, rate-limit, network, and timeout failures
+  propagate unchanged, so a bad key is never silently masked.
+- **`AnthropicCompatibleAdapter`** (`ProviderId.ANTHROPIC_COMPATIBLE`)
+  subclasses `AnthropicAdapter`: identical Messages-API wire protocol
+  (`x-api-key`, `anthropic-version`, `max_tokens: 1024`). No model
+  listing (like the first-party adapter); the connection test is a
+  minimal real completion and burns micro-quota by design.
+
+Security posture is identical to the first-party adapters: the key
+travels only in its auth header, the base URL is re-validated on every
+call (HTTPS-only except loopback, userinfo rejected, cloud metadata
+address blocked), redirects stay disabled, and keys never appear in
+logs, errors, or exports.
+
+## OpenAI-compatible endpoints (legacy note)
+
+Before Phase 8, `ProviderId.OPENAI_COMPATIBLE` existed in the enum but
+no adapter was registered for it — custom OpenAI-shaped endpoints had
+no working path. The generic adapters above close that gap; the
+per-call `EndpointValidator` guarantees from the old design are kept.
 
 **Switching provider family** (`ProvidersViewModel.selectProviderFamily`):
 a blank base-URL field, or one still holding the previous family's
@@ -185,13 +236,13 @@ best-effort basis and **never contain the API key**.
 
 ## Capability flags
 
-| Capability | OpenAI | Anthropic | Gemini |
-|---|---|---|---|
-| `streaming` | ✅ | ✅ | ✅ |
-| `systemPrompt` | ✅ | ✅ (top-level `system` field) | ✅ (`systemInstruction`) |
-| `modelListing` | ✅ (`GET /v1/models`) | ❌ (no endpoint — returns config `modelIds`) | ✅ (`GET /v1beta/models`) |
-| `vision` | ❌ | ❌ | ❌ |
-| `toolCalling` | ❌ | ❌ | ❌ |
+| Capability | OpenAI | Anthropic | Gemini | OpenAI-compat | Anthropic-compat |
+|---|---|---|---|---|---|
+| `streaming` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `systemPrompt` | ✅ | ✅ (top-level `system` field) | ✅ (`systemInstruction`) | ✅ | ✅ |
+| `modelListing` | ✅ (`GET /v1/models`) | ❌ (no endpoint — returns config `modelIds`) | ✅ (`GET /v1beta/models`) | ✅ best-effort (falls back to manual ids) | ❌ (manual ids only) |
+| `vision` | ❌ | ❌ | ❌ | ❌ | ❌ |
+| `toolCalling` | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 ## Honest limits
 
@@ -205,5 +256,9 @@ best-effort basis and **never contain the API key**.
   against real servers is verified only with the user's own key on
   their own device. Real-key testing never happens in CI or in this
   repository. Live device validation so far: **Gemini only**
-  (`gemini-3.6-flash`, 2026-10-22); OpenAI and Anthropic are
-  MockWebServer-only.
+  (`gemini-3.6-flash`, 2026-10-22); OpenAI, Anthropic, and both generic
+  adapters are MockWebServer-only.
+- Catalog suggested models are hints from public documentation,
+  re-checked 2026-10-22; they go stale — the UI and this doc label them
+  as suggestions, and "Refresh models" (where the endpoint supports it)
+  is the source of truth after saving.

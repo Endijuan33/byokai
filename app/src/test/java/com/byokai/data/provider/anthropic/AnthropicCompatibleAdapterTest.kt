@@ -7,6 +7,7 @@ import com.byokai.domain.model.ChatMessage
 import com.byokai.domain.model.ChatRole
 import com.byokai.domain.model.ProviderConfig
 import com.byokai.domain.model.ProviderId
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
@@ -101,7 +102,7 @@ class AnthropicCompatibleAdapterTest {
             ),
             events,
         )
-        val recorded = server.takeRequest()
+        val recorded = server.takeRequest(10, TimeUnit.SECONDS)!!
         assertEquals("/v1/messages", recorded.target)
         assertEquals("test-key-123", recorded.headers["x-api-key"])
     }

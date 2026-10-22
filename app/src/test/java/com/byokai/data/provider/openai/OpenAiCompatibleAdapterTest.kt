@@ -10,6 +10,7 @@ import com.byokai.domain.model.ProviderConfig
 import com.byokai.domain.model.ProviderId
 import com.byokai.domain.provider.ProviderError
 import com.byokai.domain.provider.ProviderException
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
@@ -102,7 +103,7 @@ class OpenAiCompatibleAdapterTest {
             ),
             events,
         )
-        val recorded = server.takeRequest()
+        val recorded = server.takeRequest(10, TimeUnit.SECONDS)!!
         assertEquals("/v1/chat/completions", recorded.target)
         assertEquals("Bearer test-key-123", recorded.headers["Authorization"])
     }

@@ -4,22 +4,32 @@
 
 BYOKAI is a native Android application (Kotlin, Jetpack Compose, Material 3)
 for conversing with multiple AI providers using your own API keys: OpenAI,
-Anthropic, and Google Gemini, plus OpenAI-compatible endpoints — all with
-streaming chat, conversation history, prompt templates, and import/export.
+Anthropic, and Google Gemini first-party, plus a searchable catalog of
+popular providers (DeepSeek, xAI, OpenRouter, Groq, Together AI, Fireworks
+AI, Mistral AI, Perplexity, Ollama, LM Studio) served through generic
+OpenAI-compatible and Anthropic-compatible adapters — all with streaming
+chat, conversation history, prompt templates, and import/export.
 
-> **Project status: Phase 6 — Security & Compatibility (shipped, 0.6.0).**
-> The app builds, runs on-device, and is validated by CI (253 unit tests, lint
+> **Project status: Phase 8 — Provider expansion (in progress, 0.8.0).**
+> The app builds, runs on-device, and is validated by CI (unit tests, lint
 > green, R8 release pipeline validated) and by device testing on the owner's
-> own phone (Phases 4 and 5 manual checklists passed; Gemini tested live with
-> the owner's key). See [docs/ROADMAP.md](docs/ROADMAP.md) for the honest
+> own phone (Phases 4–6 manual checklists passed; Gemini tested live with
+> the owner's key). A signed release (v0.7.0) is published on GitHub
+> Releases. See [docs/ROADMAP.md](docs/ROADMAP.md) for the honest
 > status of every phase.
 
-## Features (current, 0.6.0)
+## Features (current, 0.8.0)
 
 - **Multi-provider BYOK chat**: OpenAI (Chat Completions SSE), Anthropic
   (Messages API), Gemini (`streamGenerateContent`) — each with its own auth
-  scheme, wire format, and error normalization
+  scheme, wire format, and error normalization; plus generic
+  OpenAI-compatible and Anthropic-compatible adapters that reuse the
+  first-party wire logic for third-party and self-hosted endpoints
   ([docs/PROVIDERS.md](docs/PROVIDERS.md))
+- **Provider catalog with search**: 13 curated providers bundled in-app
+  (offline, no network fetch); search filters by name; selecting an entry
+  pre-fills the add-provider form (suggested models included, editable);
+  a Custom-provider option covers unlisted endpoints
 - **Streaming chat UI**: live message bubbles with Markdown rendering
   (code blocks with copy buttons, safe link taps), Stop while generating,
   error banner with Retry
@@ -117,8 +127,8 @@ signing (see [docs/RELEASE.md](docs/RELEASE.md)).
 
 Real API keys and real provider endpoints are **never** used in tests or CI —
 that validation happens only with the owner's own key on their own device.
-OpenAI and Anthropic are MockWebServer-only so far; Gemini has been
-tested live on-device. Details: [docs/TESTING.md](docs/TESTING.md).
+OpenAI, Anthropic, and both generic adapters are MockWebServer-only so far;
+Gemini has been tested live on-device. Details: [docs/TESTING.md](docs/TESTING.md).
 
 ## Repository layout
 

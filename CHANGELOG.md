@@ -3,6 +3,53 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.8.0] — 2026-10-22
+
+Phase 8: Provider expansion — provider catalog + generic adapters.
+
+### Added
+
+- Bundled provider catalog (`domain.provider.ProviderCatalog`): 13 curated
+  entries (OpenAI, Anthropic, Google Gemini, DeepSeek, xAI, OpenRouter,
+  Groq, Together AI, Fireworks AI, Mistral AI, Perplexity, Ollama, LM
+  Studio) shipped in-app — offline, no network fetch. Inclusion rule: an
+  entry is listed only when its base URL and protocol are known with
+  confidence.
+- Searchable catalog picker in the add-provider flow (case-insensitive
+  name search); selecting an entry pre-fills the editor (name, base URL,
+  family, suggested models) — every field stays editable.
+- `OpenAiCompatibleAdapter` (`ProviderId.OPENAI_COMPATIBLE`): reuses the
+  OpenAI wire implementation for third-party endpoints. `/v1/models` is
+  best-effort — HTTP 404 or a malformed body falls back to the manually
+  entered model ids; auth/rate-limit/network failures propagate so a bad
+  key is never masked.
+- `AnthropicCompatibleAdapter` (new `ProviderId.ANTHROPIC_COMPATIBLE`):
+  reuses the Anthropic Messages-API wire implementation for third-party
+  endpoints.
+- "Custom provider" option: pick the wire protocol
+  (OpenAI-/Anthropic-compatible) and type any base URL, with an explicit
+  note that the API key will be sent to that endpoint.
+- 26 new unit tests: catalog integrity + search, generic adapters via
+  MockWebServer (streaming, models fallback, error propagation), catalog
+  prefill in the providers ViewModel.
+
+### Changed
+
+- Provider registry now serves 5 adapter families (was 3).
+- `OpenAiAdapter` and `AnthropicAdapter` are now subclassable (`open`);
+  no behavior change for the first-party adapters.
+- Catalog suggested models are labeled "suggested" in the UI and docs —
+  hints from public documentation, never presented as verified.
+- Version bump 0.8.0 (versionCode 8).
+
+### Security
+
+- Generic adapters inherit the full per-call `EndpointValidator`
+  guarantees (HTTPS-only except loopback, userinfo rejected, cloud
+  metadata address blocked) and never log keys. Documented privacy
+  implication: custom endpoints receive the user's API key — see
+  `docs/PROVIDERS.md`.
+
 ## [0.7.0] — 2026-10-22
 
 Phase 7: Release engineering. Everything preparable without the release

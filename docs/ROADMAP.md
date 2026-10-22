@@ -155,16 +155,49 @@ action (the four signing secrets are still expected, not yet set).
   device is **explicitly pending** the owner's secrets setup + first
   Release workflow run — that is the designed handoff, not a failure.
 
-## Phase 8 — Continuous improvement — NOT STARTED
+## Phase 8 — Provider expansion — SHIPPED (0.8.0)
+
+Many adapters like OpenCode's provider list, without N bespoke
+implementations: a bundled, searchable provider catalog plus two generic
+adapters that reuse the first-party wire logic.
+
+- **Provider catalog** (`domain.provider.ProviderCatalog`): 13 curated
+  entries bundled in-app (offline, no network fetch) — OpenAI, Anthropic,
+  Google Gemini, DeepSeek, xAI, OpenRouter, Groq, Together AI, Fireworks
+  AI, Mistral AI, Perplexity, Ollama, LM Studio. Each entry: id, display
+  name, adapter family, base URL, suggested models, website. Inclusion
+  rule: listed only when base URL + protocol are known with confidence.
+- **Search**: the add-provider flow opens a catalog picker whose search
+  field filters by name (case-insensitive). Selecting an entry pre-fills
+  the editor (name, base URL, family, suggested models) — every field
+  stays editable.
+- **Generic adapters**: `OpenAiCompatibleAdapter`
+  (`ProviderId.OPENAI_COMPATIBLE`) and `AnthropicCompatibleAdapter` (new
+  `ProviderId.ANTHROPIC_COMPATIBLE`) subclass the first-party adapters:
+  identical SSE streaming, error envelopes, retries, and per-call
+  `EndpointValidator` checks (HTTPS-only except loopback, userinfo
+  rejected, metadata address blocked). No fixed base URL.
+- **Best-effort model listing**: the generic OpenAI adapter falls back
+  to the config's manually entered model ids when the endpoint has no
+  `GET /v1/models` (HTTP 404 or malformed body); auth/rate-limit/network
+  failures propagate so a bad key is never masked.
+- **Custom provider**: endpoints not in the catalog can be added by
+  choosing the wire protocol (OpenAI-/Anthropic-compatible) and typing
+  the base URL, with an explicit note that the API key will be sent to
+  that endpoint.
+- **Honesty**: catalog models are labeled "suggested", never verified;
+  the registry now serves 5 adapter families.
+- Acceptance note: generic adapters are MockWebServer-validated only;
+  live testing against real third-party endpoints needs the owner's own
+  keys on their own device (manual checklist in the release report).
+
+## Phase 9 — Continuous improvement — NOT STARTED
 
 Issue triage, regression fixes, controlled dependency updates, periodic
 quality/security audits.
 
 ### Uncommitted future candidates (not promised, not scheduled)
 
-- Compatible-endpoint adapters (DeepSeek, xAI, OpenRouter) once the
-  foundation is stable — the `OPENAI_COMPATIBLE` provider id exists for
-  this, but no adapter work has started.
 - Automatic context summarization (currently: heuristic estimate +
   request-side truncation only).
 - Encrypted conversation history (optional; the DB is deliberately
