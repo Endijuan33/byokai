@@ -12,6 +12,12 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <!-- Camera is optional (gallery attach works without it); declaring
+         the feature as not required keeps ChromeOS/PC installs working. -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <application
         android:name=".ByokaiApplication"
         android:allowBackup="true"
