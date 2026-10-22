@@ -412,6 +412,9 @@ private fun ProviderEditorSheet(
                 value = draft.baseUrl,
                 onValueChange = { onDraftChange(draft.copy(baseUrl = it)) },
                 label = { Text(stringResource(R.string.providers_field_base_url)) },
+                supportingText = {
+                    Text(stringResource(R.string.providers_base_url_hint))
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )

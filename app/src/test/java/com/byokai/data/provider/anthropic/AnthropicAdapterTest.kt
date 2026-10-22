@@ -52,7 +52,7 @@ class AnthropicAdapterTest {
         server.close()
     }
 
-    private fun config(baseUrl: String = server.url("/").toString().trimEnd('/')) =
+    private fun config(baseUrl: String = server.url("/v1").toString().trimEnd('/')) =
         ProviderConfig(
             id = "cfg-test",
             providerId = ProviderId.ANTHROPIC,
@@ -475,7 +475,7 @@ class AnthropicAdapterTest {
     fun `adapter advertises Anthropic identity and capabilities`() {
         assertEquals(ProviderId.ANTHROPIC, adapter.providerId)
         assertEquals("Anthropic", adapter.displayName)
-        assertEquals("https://api.anthropic.com", adapter.defaultBaseUrl)
+        assertEquals("https://api.anthropic.com/v1", adapter.defaultBaseUrl)
         assertTrue(adapter.capabilities.streaming)
         assertTrue(adapter.capabilities.systemPrompt)
         assertTrue(!adapter.capabilities.modelListing)

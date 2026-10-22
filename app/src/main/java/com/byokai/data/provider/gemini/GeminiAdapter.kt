@@ -137,6 +137,7 @@ class GeminiAdapter(private val client: OkHttpClient) : AiProvider {
                                         response.code,
                                         errorBody,
                                         response.header("Retry-After"),
+                                        request.modelId,
                                     )
                                     val decision = RetryPolicy.decide(attempt, error, streamStarted)
                                     if (decision.shouldRetry) {
@@ -233,6 +234,7 @@ class GeminiAdapter(private val client: OkHttpClient) : AiProvider {
         code: Int,
         body: String,
         retryAfterHeader: String?,
+        modelId: String = "",
     ): ProviderError {
         val message = extractErrorMessage(code, body)
         return when (code) {
@@ -241,7 +243,7 @@ class GeminiAdapter(private val client: OkHttpClient) : AiProvider {
                 message,
                 retryAfterHeader?.trim()?.toLongOrNull(),
             )
-            404 -> ProviderError.InvalidModel("")
+            404 -> ProviderError.InvalidModel(modelId)
             else -> ProviderError.Server(code, message)
         }
     }

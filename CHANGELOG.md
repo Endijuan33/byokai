@@ -3,6 +3,36 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.8.1] — 2026-10-22
+
+Bugfix: base-URL path convention (OpenAI SDK style).
+
+### Fixed
+
+- Base URL convention: the base URL now carries the version prefix
+  exactly as the provider documents it (e.g.
+  `https://api.openai.com/v1`); adapters append only the endpoint path
+  (`/chat/completions`, `/models`, `/messages`). Previously the
+  adapters baked `/v1` into request paths, which broke 7 of 13 catalog
+  entries — e.g. Groq (`https://api.groq.com/openai/v1`) resolved to
+  `…/openai/v1/v1/chat/completions` and 404'd on every chat call.
+- Catalog base URLs corrected: OpenAI/Anthropic/DeepSeek/xAI/Ollama now
+  include `/v1`; Groq/OpenRouter/Together/Fireworks/Mistral/LM Studio
+  were already correct; Perplexity stays prefix-less (now correct).
+- Stored configs from before v0.8.1 migrate automatically on load:
+  exact matches of the old defaults gain `/v1`; custom user URLs are
+  never touched.
+- `ProviderError.InvalidModel` now carries the requested model id on
+  the streaming path; when the id is unknown the UI shows "The selected
+  model is not available with this key." instead of the broken
+  "Model  is not available with this key."
+- Groq suggested models refreshed from official docs:
+  `llama-3.3-70b-versatile` / `llama-3.1-8b-instant` (now
+  Enterprise-only) replaced with production models `openai/gpt-oss-20b`
+  / `openai/gpt-oss-120b`.
+- Base-URL field in the provider editor now shows a hint: paste the URL
+  exactly as documented, including the `/v1` prefix.
+
 ## [0.8.0] — 2026-10-22
 
 Phase 8: Provider expansion — provider catalog + generic adapters.

@@ -36,10 +36,14 @@ import okhttp3.Response
 import okio.Buffer
 
 /**
- * [AiProvider] for the Anthropic Messages API (`https://api.anthropic.com`).
+ * [AiProvider] for the Anthropic Messages API (`https://api.anthropic.com/v1`).
+ *
+ * Base URL convention (same as OpenAI SDK style): the base URL includes
+ * the version prefix exactly as documented
+ * (`https://api.anthropic.com/v1`); the adapter appends only `/messages`.
  *
  * Completions are streamed as Server-Sent Events from
- * `POST {baseUrl}/v1/messages` with `stream: true`. Unlike OpenAI there is
+ * `POST {baseUrl}/messages` with `stream: true`. Unlike OpenAI there is
  * no `[DONE]` sentinel: the stream ends with an `event: message_stop`
  * message, and a clean EOF is also accepted as a normal end of stream.
  * Anthropic exposes no model-listing endpoint, so [listModels] returns the
@@ -61,7 +65,7 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
 
     open override val providerId: ProviderId = ProviderId.ANTHROPIC
     open override val displayName: String = "Anthropic"
-    open override val defaultBaseUrl: String = "https://api.anthropic.com"
+    open override val defaultBaseUrl: String = "https://api.anthropic.com/v1"
     open override val capabilities: ProviderCapabilities = ProviderCapabilities(
         streaming = true,
         systemPrompt = true,
@@ -70,7 +74,7 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
 
     /**
      * Streams a chat completion as SSE events from
-     * `POST {baseUrl}/v1/messages`.
+     * `POST {baseUrl}/messages`.
      *
      * Request mapping:
      * - `model` = [ChatRequest.modelId].
@@ -159,6 +163,7 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
                                     response.code,
                                     errorBody,
                                     response.header("Retry-After"),
+                                    request.modelId,
                                 )
                                 val decision = RetryPolicy.decide(attempt, error, streamStarted)
                                 if (decision.shouldRetry) {
@@ -215,7 +220,7 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
                                                 )
                                                 throw TerminalEventSent()
                                             }
-                                            trySend(ChatEvent.Error(normalizeStreamError(detail)))
+                                            trySend(ChatEvent.Error(normalizeStreamError(detail, request.modelId)))
                                             throw TerminalEventSent()
                                         }
                                         else -> Unit // message_start, content_block_start/stop,
@@ -273,7 +278,8 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
      * - 401/403 → [ProviderError.Auth]
      * - 429 → [ProviderError.RateLimited], with the `Retry-After` hint when
      *   [retryAfterHeader] parses as seconds.
-     * - 404 → [ProviderError.InvalidModel]
+     * - 404 → [ProviderError.InvalidModel] carrying [modelId] when known;
+     *   a blank [modelId] renders a nameless message in the UI.
      * - 5xx and anything else → [ProviderError.Server]
      *
      * The message is taken from the API's
@@ -284,6 +290,7 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
         code: Int,
         body: String,
         retryAfterHeader: String?,
+        modelId: String = "",
     ): ProviderError {
         val message = extractErrorMessage(code, body)
         return when (code) {
@@ -292,7 +299,7 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
                 message,
                 retryAfterHeader?.trim()?.toLongOrNull(),
             )
-            404 -> ProviderError.InvalidModel("")
+            404 -> ProviderError.InvalidModel(modelId)
             else -> ProviderError.Server(code, message)
         }
     }
@@ -311,7 +318,7 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
 
     /**
      * Verifies reachability and credentials with a minimal non-streaming
-     * `POST {baseUrl}/v1/messages` (`max_tokens: 1`, one one-word user
+     * `POST {baseUrl}/messages` (`max_tokens: 1`, one one-word user
      * message). A 2xx response means the key works.
      *
      * **Quota note:** unlike the OpenAI/Gemini listing-based tests, this
@@ -402,17 +409,18 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
      * Maps an SSE `error` event's detail to a [ProviderError] by the
      * Anthropic error type: `authentication_error`/`permission_error` →
      * [ProviderError.Auth], `rate_limit_error` → [ProviderError.RateLimited],
-     * `not_found_error` → [ProviderError.InvalidModel], everything else →
+     * `not_found_error` → [ProviderError.InvalidModel] (carrying [modelId]
+     *   when known), everything else →
      * [ProviderError.Server]. Never includes the API key.
      */
-    private fun normalizeStreamError(detail: StreamErrorDetailDto): ProviderError {
+    private fun normalizeStreamError(detail: StreamErrorDetailDto, modelId: String = ""): ProviderError {
         val message = detail.message.ifBlank {
             detail.type.ifBlank { "stream error" }
         }
         return when (detail.type) {
             "authentication_error", "permission_error" -> ProviderError.Auth(message)
             "rate_limit_error" -> ProviderError.RateLimited(message, null)
-            "not_found_error" -> ProviderError.InvalidModel("")
+            "not_found_error" -> ProviderError.InvalidModel(modelId)
             else -> ProviderError.Server(0, message)
         }
     }
@@ -455,7 +463,7 @@ open class AnthropicAdapter(private val client: OkHttpClient) : AiProvider {
     }
 
     private companion object {
-        const val MESSAGES_PATH = "/v1/messages"
+        const val MESSAGES_PATH = "/messages"
         const val ANTHROPIC_VERSION = "2023-06-01"
         /** Generation ceiling for chat completions; see [streamChat] KDoc. */
         const val DEFAULT_MAX_TOKENS = 1024

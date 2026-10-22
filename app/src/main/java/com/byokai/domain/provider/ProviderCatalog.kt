@@ -37,6 +37,14 @@ data class CatalogEntry(
  * public documentation — they are labeled "suggested" in the UI and docs
  * and are never presented as verified.
  *
+ * Base URL convention (OpenAI SDK style): the base URL includes the
+ * version prefix exactly as the provider documents it
+ * (e.g. `https://api.openai.com/v1`); adapters append only the
+ * endpoint path (`/chat/completions`, `/models`, `/messages`).
+ * Never bake `/v1` into adapter request paths — third-party endpoints
+ * document their own prefixes (Groq uses `/openai/v1`, Perplexity
+ * uses none).
+ *
  * Pure Kotlin, no Android dependencies, so the catalog (and its search)
  * is unit-testable on the JVM.
  */
@@ -51,7 +59,7 @@ object ProviderCatalog {
             id = "openai",
             displayName = "OpenAI",
             providerId = ProviderId.OPENAI,
-            defaultBaseUrl = "https://api.openai.com",
+            defaultBaseUrl = "https://api.openai.com/v1",
             suggestedModels = listOf("gpt-4o", "gpt-4o-mini"),
             website = "https://openai.com",
         ),
@@ -59,7 +67,7 @@ object ProviderCatalog {
             id = "anthropic",
             displayName = "Anthropic",
             providerId = ProviderId.ANTHROPIC,
-            defaultBaseUrl = "https://api.anthropic.com",
+            defaultBaseUrl = "https://api.anthropic.com/v1",
             suggestedModels = listOf("claude-sonnet-4-6", "claude-opus-4-6"),
             website = "https://anthropic.com",
         ),
@@ -75,7 +83,7 @@ object ProviderCatalog {
             id = "deepseek",
             displayName = "DeepSeek",
             providerId = ProviderId.OPENAI_COMPATIBLE,
-            defaultBaseUrl = "https://api.deepseek.com",
+            defaultBaseUrl = "https://api.deepseek.com/v1",
             suggestedModels = listOf("deepseek-chat", "deepseek-reasoner"),
             website = "https://deepseek.com",
         ),
@@ -83,7 +91,7 @@ object ProviderCatalog {
             id = "xai",
             displayName = "xAI",
             providerId = ProviderId.OPENAI_COMPATIBLE,
-            defaultBaseUrl = "https://api.x.ai",
+            defaultBaseUrl = "https://api.x.ai/v1",
             suggestedModels = listOf("grok-4-1-fast-non-reasoning", "grok-3-mini"),
             website = "https://x.ai",
         ),
@@ -100,7 +108,7 @@ object ProviderCatalog {
             displayName = "Groq",
             providerId = ProviderId.OPENAI_COMPATIBLE,
             defaultBaseUrl = "https://api.groq.com/openai/v1",
-            suggestedModels = listOf("llama-3.3-70b-versatile", "llama-3.1-8b-instant"),
+            suggestedModels = listOf("openai/gpt-oss-20b", "openai/gpt-oss-120b"),
             website = "https://groq.com",
         ),
         CatalogEntry(
@@ -142,7 +150,7 @@ object ProviderCatalog {
             id = "ollama",
             displayName = "Ollama",
             providerId = ProviderId.OPENAI_COMPATIBLE,
-            defaultBaseUrl = "http://localhost:11434",
+            defaultBaseUrl = "http://localhost:11434/v1",
             suggestedModels = listOf("llama3.3", "qwen3"),
             website = "https://ollama.com",
         ),

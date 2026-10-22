@@ -65,12 +65,38 @@ terminal `Error`.
 `modelIds`; `defaultModelId` (when set) ∈ `modelIds`. Configs carry **no
 API key** — keys live only in the `CredentialStore` keyed by config id.
 
+## Base URL convention
+
+OpenAI SDK style: the base URL includes the version prefix **exactly as
+the provider documents it** (e.g. `https://api.openai.com/v1`); adapters
+append only the endpoint path (`/chat/completions`, `/models`,
+`/messages`). The adapters never bake `/v1` into request paths —
+third-party endpoints document their own prefixes:
+
+| Provider | Base URL to paste | Resolves to |
+|---|---|---|
+| OpenAI | `https://api.openai.com/v1` | `…/v1/chat/completions` |
+| DeepSeek | `https://api.deepseek.com/v1` | `…/v1/chat/completions` |
+| Groq | `https://api.groq.com/openai/v1` | `…/openai/v1/chat/completions` |
+| Perplexity | `https://api.perplexity.ai` (no `/v1`) | `…/chat/completions` |
+| Ollama | `http://localhost:11434/v1` | `…/v1/chat/completions` |
+
+When adding a custom provider, paste the base URL from the provider's
+own docs verbatim. If chat calls 404, the first thing to check is the
+prefix: a doubled `/v1` (`…/v1/v1/chat/completions`) is the usual
+cause.
+
+Migration note (v0.8.1): configs stored before v0.8.1 carry the old
+defaults without `/v1` (the adapters used to append it). On load, exact
+matches of those old defaults are migrated to the new form
+automatically; custom URLs are never touched.
+
 ## OpenAI
 
 - **Auth**: `Authorization: Bearer <apiKey>` header; key never logged,
   never stored outside the credential store, never in error messages.
-- **Base URL** (default): `https://api.openai.com`.
-- **Chat**: `POST {baseUrl}/v1/chat/completions`, body
+- **Base URL** (default): `https://api.openai.com/v1`.
+- **Chat**: `POST {baseUrl}/chat/completions`, body
   `{model, messages, stream: true}`. System prompt goes first as role
   `"system"`; domain roles map `SYSTEM→"system"`, `USER→"user"`,
   `ASSISTANT→"assistant"`.
@@ -80,8 +106,8 @@ API key** — keys live only in the `CredentialStore` keyed by config id.
   `Parse` error (`"stream ended without [DONE]"`).
 - **Error envelope**: `{"error": {"message": "..."}}`, best-effort;
   falls back to `"HTTP <code>"`.
-- **listModels**: `GET {baseUrl}/v1/models`; blank ids filtered out.
-- **testConnection**: cheap `GET {baseUrl}/v1/models` — no model call,
+- **listModels**: `GET {baseUrl}/models`; blank ids filtered out.
+- **testConnection**: cheap `GET {baseUrl}/models` — no model call,
   so no quota burn beyond the listing call itself.
 
 ## Provider catalog (Phase 8)
@@ -121,7 +147,7 @@ adapters reuse the first-party wire implementations:
   retries, and per-call `EndpointValidator` checks. No fixed base URL —
   the user picks one from the catalog or types a custom endpoint.
   **Model listing is best-effort**: endpoints that do not implement
-  `GET /v1/models` (HTTP 404, or a body that is not the OpenAI
+  `GET /models` (HTTP 404, or a body that is not the OpenAI
   envelope) fall back to the config's manually entered model ids
   instead of failing. Auth, rate-limit, network, and timeout failures
   propagate unchanged, so a bad key is never silently masked.
@@ -155,8 +181,8 @@ clobbered by accident.
 - **Auth**: `x-api-key: <apiKey>` header (plus the required
   `anthropic-version: 2023-06-01` header); key never logged, never
   stored outside the credential store, never in error messages.
-- **Base URL** (default): `https://api.anthropic.com`.
-- **Chat**: `POST {baseUrl}/v1/messages`, body
+- **Base URL** (default): `https://api.anthropic.com/v1`.
+- **Chat**: `POST {baseUrl}/messages`, body
   `{model, max_tokens, stream: true, system?, messages}`.
   - `max_tokens` is **required by the API (no server default)**; chat
     uses **1024** — a deliberately modest generation ceiling that bounds
@@ -184,7 +210,7 @@ clobbered by accident.
   the contract this returns the config's known `modelIds` as `ModelInfo`
   entries — no network call, no quota burn.
 - **testConnection**: a minimal **real** non-streaming
-  `POST {baseUrl}/v1/messages` (`max_tokens: 1`, one one-word user
+  `POST {baseUrl}/messages` (`max_tokens: 1`, one one-word user
   message) against the config's `defaultModelId` (falling back to the
   first `modelId`); fails with `Config` when no model id is configured.
   **Quota note**: unlike the OpenAI/Gemini listing-based tests, this
@@ -240,7 +266,7 @@ best-effort basis and **never contain the API key**.
 |---|---|---|---|---|---|
 | `streaming` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `systemPrompt` | ✅ | ✅ (top-level `system` field) | ✅ (`systemInstruction`) | ✅ | ✅ |
-| `modelListing` | ✅ (`GET /v1/models`) | ❌ (no endpoint — returns config `modelIds`) | ✅ (`GET /v1beta/models`) | ✅ best-effort (falls back to manual ids) | ❌ (manual ids only) |
+| `modelListing` | ✅ (`GET /models`) | ❌ (no endpoint — returns config `modelIds`) | ✅ (`GET /v1beta/models`) | ✅ best-effort (falls back to manual ids) | ❌ (manual ids only) |
 | `vision` | ❌ | ❌ | ❌ | ❌ | ❌ |
 | `toolCalling` | ❌ | ❌ | ❌ | ❌ | ❌ |
 

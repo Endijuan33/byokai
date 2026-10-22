@@ -46,7 +46,7 @@ class OpenAiCompatibleAdapterTest {
         server.close()
     }
 
-    private fun config(baseUrl: String = server.url("/").toString().trimEnd('/')) =
+    private fun config(baseUrl: String = server.url("/v1").toString().trimEnd('/')) =
         ProviderConfig(
             id = "cfg-test",
             providerId = ProviderId.OPENAI_COMPATIBLE,
@@ -109,7 +109,44 @@ class OpenAiCompatibleAdapterTest {
     }
 
     @Test
-    fun `listModels returns server models on success`() = runBlocking {
+    fun `streams against a path-prefixed base URL without doubling the prefix`() = runBlocking {
+        // Regression test for the Groq incident: base URL
+        // "https://api.groq.com/openai/v1" must resolve to
+        // "/openai/v1/chat/completions", never "/openai/v1/v1/chat/completions".
+        val groqStyle = config(baseUrl = server.url("/openai/v1").toString().trimEnd('/'))
+        server.enqueue(
+            MockResponse.Builder()
+                .code(200)
+                .addHeader("Content-Type", "text/event-stream")
+                .body(sse(chunkJson("OK")))
+                .build(),
+        )
+
+        val events = adapter.streamChat(groqStyle, "test-key-123", request()).toList()
+
+        assertEquals(
+            listOf(ChatEvent.Delta("OK"), ChatEvent.Done("OK")),
+            events,
+        )
+        val recorded = server.takeRequest(10, TimeUnit.SECONDS)!!
+        assertEquals("/openai/v1/chat/completions", recorded.target)
+    }
+
+    @Test
+    fun `streaming 404 carries the requested model id`() = runBlocking {
+        server.enqueue(
+            MockResponse.Builder()
+                .code(404)
+                .body("""{"error":{"message":"model not found","type":"invalid_request_error"}}""")
+                .build(),
+        )
+
+        val events = adapter.streamChat(config(), "test-key-123", request()).toList()
+
+        val error = (events.single() as ChatEvent.Error).error
+        assertTrue(error is ProviderError.InvalidModel)
+        assertEquals("custom-model-a", (error as ProviderError.InvalidModel).modelId)
+    }
         server.enqueue(
             MockResponse.Builder()
                 .code(200)

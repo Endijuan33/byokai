@@ -35,6 +35,7 @@
     <string name="error_provider_timeout">The request timed out. Please try again.</string>
     <string name="error_provider_network">Network error: %1$s</string>
     <string name="error_provider_invalid_model">Model "%1$s" is not available with this key.</string>
+    <string name="error_provider_invalid_model_unknown">The selected model is not available with this key.</string>
     <string name="error_provider_server">Provider error (HTTP %1$d): %2$s</string>
     <string name="error_provider_parse">Could not read the provider\'s response: %1$s</string>
     <string name="error_provider_empty_response">The provider returned an empty response. Try again or rephrase your message.</string>
@@ -55,6 +56,7 @@
     <string name="providers_field_provider">Provider</string>
     <string name="providers_field_display_name">Display name</string>
     <string name="providers_field_base_url">Base URL</string>
+    <string name="providers_base_url_hint">Paste the base URL exactly as the provider documents it, including the /v1 prefix.</string>
     <string name="providers_field_api_key">API key</string>
     <string name="providers_api_key_hint_new">Paste your API key</string>
     <string name="providers_api_key_hint_existing">Saved — enter a new key to replace it</string>

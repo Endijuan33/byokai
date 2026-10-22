@@ -35,6 +35,7 @@
     <string name="error_provider_timeout">Permintaan habis waktu. Coba lagi.</string>
     <string name="error_provider_network">Kesalahan jaringan: %1$s</string>
     <string name="error_provider_invalid_model">Model "%1$s" tidak tersedia dengan kunci ini.</string>
+    <string name="error_provider_invalid_model_unknown">Model yang dipilih tidak tersedia dengan kunci ini.</string>
     <string name="error_provider_server">Kesalahan provider (HTTP %1$d): %2$s</string>
     <string name="error_provider_parse">Tidak dapat membaca respons provider: %1$s</string>
     <string name="error_provider_empty_response">Provider mengembalikan respons kosong. Coba lagi atau ubah pesan Anda.</string>
@@ -55,6 +56,7 @@
     <string name="providers_field_provider">Penyedia</string>
     <string name="providers_field_display_name">Nama tampilan</string>
     <string name="providers_field_base_url">URL dasar</string>
+    <string name="providers_base_url_hint">Tempel URL dasar persis seperti yang didokumentasikan provider, termasuk awalan /v1.</string>
     <string name="providers_field_api_key">Kunci API</string>
     <string name="providers_api_key_hint_new">Tempel API key milikmu</string>
     <string name="providers_api_key_hint_existing">Tersimpan — masukkan kunci baru untuk menggantinya</string>

@@ -52,7 +52,7 @@ class OpenAiAdapterTest {
         server.close()
     }
 
-    private fun config(baseUrl: String = server.url("/").toString().trimEnd('/')) =
+    private fun config(baseUrl: String = server.url("/v1").toString().trimEnd('/')) =
         ProviderConfig(
             id = "cfg-test",
             providerId = ProviderId.OPENAI,
@@ -402,7 +402,7 @@ class OpenAiAdapterTest {
     fun `adapter advertises OpenAI identity and capabilities`() {
         assertEquals(ProviderId.OPENAI, adapter.providerId)
         assertEquals("OpenAI", adapter.displayName)
-        assertEquals("https://api.openai.com", adapter.defaultBaseUrl)
+        assertEquals("https://api.openai.com/v1", adapter.defaultBaseUrl)
         assertTrue(adapter.capabilities.streaming)
         assertTrue(adapter.capabilities.systemPrompt)
         assertTrue(adapter.capabilities.modelListing)

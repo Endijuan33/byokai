@@ -36,11 +36,18 @@ import okhttp3.Response
 import okio.Buffer
 
 /**
- * [AiProvider] for the OpenAI chat API (`https://api.openai.com`) and any
+ * [AiProvider] for the OpenAI chat API (`https://api.openai.com/v1`) and any
  * OpenAI-compatible endpoint ([ProviderId.OPENAI_COMPATIBLE]).
  *
+ * Base URL convention (OpenAI SDK style): the base URL includes the
+ * version prefix exactly as the provider documents it (e.g.
+ * `https://api.openai.com/v1`); the adapter appends only
+ * `/chat/completions` and `/models`. Never bake `/v1` into the request
+ * paths — third-party endpoints document their own prefixes (Groq uses
+ * `/openai/v1`, Perplexity uses none).
+ *
  * Chat completions are streamed as Server-Sent Events; model listing and
- * connection tests hit `GET /v1/models`.
+ * connection tests hit `GET /models`.
  *
  * Security notes:
  * - The [apiKey] is sent only as an `Authorization: Bearer` header and is
@@ -57,7 +64,7 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
 
     open override val providerId: ProviderId = ProviderId.OPENAI
     open override val displayName: String = "OpenAI"
-    open override val defaultBaseUrl: String = "https://api.openai.com"
+    open override val defaultBaseUrl: String = "https://api.openai.com/v1"
     open override val capabilities: ProviderCapabilities = ProviderCapabilities(
         streaming = true,
         systemPrompt = true,
@@ -66,7 +73,7 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
 
     /**
      * Streams a chat completion as SSE events from
-     * `POST {baseUrl}/v1/chat/completions`.
+     * `POST {baseUrl}/chat/completions`.
      *
      * Emits [ChatEvent.Delta] per text chunk, then exactly one terminal
      * event: [ChatEvent.Done] after `data: [DONE]`, or [ChatEvent.Error] on
@@ -134,6 +141,7 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
                                     response.code,
                                     errorBody,
                                     response.header("Retry-After"),
+                                    request.modelId,
                                 )
                                 val decision = RetryPolicy.decide(attempt, error, streamStarted)
                                 if (decision.shouldRetry) {
@@ -223,7 +231,9 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
      * - 401/403 → [ProviderError.Auth]
      * - 429 → [ProviderError.RateLimited], with the `Retry-After` hint when
      *   [retryAfterHeader] parses as seconds.
-     * - 404 → [ProviderError.InvalidModel]
+     * - 404 → [ProviderError.InvalidModel] carrying [modelId] when known
+     *   (streaming path); a blank [modelId] renders a nameless message in
+     *   the UI rather than "Model  is not...".
      * - 5xx and anything else → [ProviderError.Server]
      *
      * The message is taken from the API's `{"error":{"message":...}}`
@@ -234,6 +244,7 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
         code: Int,
         body: String,
         retryAfterHeader: String?,
+        modelId: String = "",
     ): ProviderError {
         val message = extractErrorMessage(code, body)
         return when (code) {
@@ -242,13 +253,13 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
                 message,
                 retryAfterHeader?.trim()?.toLongOrNull(),
             )
-            404 -> ProviderError.InvalidModel("")
+            404 -> ProviderError.InvalidModel(modelId)
             else -> ProviderError.Server(code, message)
         }
     }
 
     /**
-     * Lists chat models via `GET {baseUrl}/v1/models`.
+     * Lists chat models via `GET {baseUrl}/models`.
      */
     override suspend fun listModels(
         config: ProviderConfig,
@@ -301,7 +312,7 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
 
     /**
      * Verifies reachability and credentials with a cheap `GET
-     * {baseUrl}/v1/models` — no model call, so no quota burn beyond the
+     * {baseUrl}/models` — no model call, so no quota burn beyond the
      * listing call itself.
      */
     override suspend fun testConnection(
@@ -397,8 +408,8 @@ open class OpenAiAdapter(private val client: OkHttpClient) : AiProvider {
     }
 
     private companion object {
-        const val CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
-        const val MODELS_PATH = "/v1/models"
+        const val CHAT_COMPLETIONS_PATH = "/chat/completions"
+        const val MODELS_PATH = "/models"
         const val DONE_SENTINEL = "[DONE]"
         const val MAX_ERROR_BODY_BYTES = 64L * 1024L
         const val MAX_MODEL_LIST_BYTES = 1024L * 1024L

@@ -43,7 +43,7 @@ class AnthropicCompatibleAdapterTest {
         server.close()
     }
 
-    private fun config(baseUrl: String = server.url("/").toString().trimEnd('/')) =
+    private fun config(baseUrl: String = server.url("/v1").toString().trimEnd('/')) =
         ProviderConfig(
             id = "cfg-test",
             providerId = ProviderId.ANTHROPIC_COMPATIBLE,

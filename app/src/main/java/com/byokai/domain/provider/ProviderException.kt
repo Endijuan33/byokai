@@ -23,7 +23,11 @@ class ProviderException(
             is ProviderError.Network ->
                 "Network failure: ${error.cause.message ?: error.cause::class.simpleName}"
             is ProviderError.InvalidModel ->
-                "Unknown or inaccessible model '${error.modelId}'"
+                if (error.modelId.isBlank()) {
+                    "Unknown or inaccessible model"
+                } else {
+                    "Unknown or inaccessible model '${error.modelId}'"
+                }
             is ProviderError.Server -> "HTTP ${error.statusCode}: ${error.message}"
             is ProviderError.Parse -> "Malformed response: ${error.message}"
             is ProviderError.Config -> "Configuration problem: ${error.message}"

@@ -12,14 +12,16 @@ import okhttp3.OkHttpClient
 /**
  * [com.byokai.domain.provider.AiProvider] for any third-party endpoint
  * that speaks the OpenAI chat-completions wire protocol
- * (`POST {baseUrl}/v1/chat/completions` with SSE streaming).
+ * (`POST {baseUrl}/chat/completions` with SSE streaming).
  *
  * Reuses the entire [OpenAiAdapter] wire implementation; only the
  * identity differs. There is no fixed base URL — the user picks one from
- * the provider catalog or types a custom endpoint.
+ * the provider catalog or types a custom endpoint. Paste the base URL
+ * exactly as the provider documents it, including the `/v1` prefix when
+ * the provider's docs include one.
  *
  * Model listing is best-effort: endpoints that do not implement
- * `GET /v1/models` (HTTP 404, or a body that is not the expected
+ * `GET /models` (HTTP 404, or a body that is not the expected
  * envelope) fall back to the config's manually entered model ids instead
  * of failing. Authentication, rate-limit, network, and timeout failures
  * are propagated unchanged so a bad key or a dead endpoint is never

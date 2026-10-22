@@ -7,12 +7,13 @@ import okhttp3.OkHttpClient
 /**
  * [com.byokai.domain.provider.AiProvider] for any third-party endpoint
  * that speaks the Anthropic Messages API wire protocol
- * (`POST {baseUrl}/v1/messages` with SSE streaming, `x-api-key` auth,
+ * (`POST {baseUrl}/messages` with SSE streaming, `x-api-key` auth,
  * `anthropic-version` header).
  *
  * Reuses the entire [AnthropicAdapter] wire implementation; only the
  * identity differs. There is no fixed base URL — the user types a custom
- * endpoint. Like the first-party adapter there is no model-listing
+ * endpoint, pasted exactly as documented including the `/v1` prefix when
+ * the endpoint's docs include one. Like the first-party adapter there is no model-listing
  * endpoint, so models are always entered manually; the connection test
  * performs a minimal real completion (micro-quota by design).
  *

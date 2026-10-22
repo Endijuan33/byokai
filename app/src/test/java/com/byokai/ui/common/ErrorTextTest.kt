@@ -76,6 +76,20 @@ class ErrorTextTest {
     }
 
     @Test
+    fun `InvalidModel with blank id uses the nameless message`() {
+        // Regression test for the Groq incident: a 404 with no model id
+        // must never render as "Model  is not available with this key."
+        assertEquals(
+            UiText.Res(R.string.error_provider_invalid_model_unknown),
+            ProviderError.InvalidModel("").userMessage(),
+        )
+        assertEquals(
+            UiText.Res(R.string.error_provider_invalid_model_unknown),
+            ProviderError.InvalidModel("   ").userMessage(),
+        )
+    }
+
+    @Test
     fun `Server includes status code and message`() {
         assertEquals(
             UiText.Res(R.string.error_provider_server, listOf(500, "boom")),

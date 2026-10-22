@@ -111,6 +111,63 @@ class DataStoreProviderConfigRepositoryTest {
         assertNull(repository.get("cfg-1"))
     }
 
+    @Test
+    fun `legacy base urls migrate to the v1 convention on read`() {
+        val cases = mapOf(
+            "https://api.openai.com" to "https://api.openai.com/v1",
+            "https://api.anthropic.com" to "https://api.anthropic.com/v1",
+            "https://api.deepseek.com" to "https://api.deepseek.com/v1",
+            "https://api.x.ai" to "https://api.x.ai/v1",
+            "http://localhost:11434" to "http://localhost:11434/v1",
+            // Trailing-slash variant of a legacy default still migrates.
+            "https://api.openai.com/" to "https://api.openai.com/v1",
+        )
+        for ((old, expected) in cases) {
+            val migrated = DataStoreProviderConfigRepository.migrateLegacyBaseUrl(
+                validConfig().copy(baseUrl = old),
+            )
+            assertEquals(expected, migrated.baseUrl)
+        }
+    }
+
+    @Test
+    fun `custom and already-migrated base urls are never touched`() {
+        val untouched = listOf(
+            "https://api.openai.com/v1",
+            "https://api.groq.com/openai/v1",
+            "https://api.perplexity.ai",
+            "https://my-proxy.example.com/v1",
+            "https://api.openai.com.evil.example.com",
+            "http://localhost:11434/v1",
+        )
+        for (url in untouched) {
+            val result = DataStoreProviderConfigRepository.migrateLegacyBaseUrl(
+                validConfig().copy(baseUrl = url),
+            )
+            assertEquals(url, result.baseUrl)
+        }
+    }
+
+    @Test
+    fun `stored legacy config reads back migrated and persists on save`() = runTest {
+        // Simulate a pre-v0.8.1 payload written directly to DataStore.
+        val legacyJson =
+            """[{"id":"cfg-1","providerId":"OPENAI","displayName":"Test OpenAI","baseUrl":"https://api.openai.com","modelIds":["gpt-4o"],"defaultModelId":"gpt-4o","createdAt":1700000000000,"updatedAt":1700000000000}]"""
+        dataStore.edit { prefs ->
+            prefs[DataStoreProviderConfigRepository.KEY_CONFIGS_JSON] = legacyJson
+        }
+
+        val read = repository.get("cfg-1")!!
+        assertEquals("https://api.openai.com/v1", read.baseUrl)
+
+        // Saving an unrelated config persists the migrated URL too.
+        assertTrue(repository.save(validConfig("cfg-2")) is Result.Success)
+        assertEquals(
+            "https://api.openai.com/v1",
+            repository.get("cfg-1")!!.baseUrl,
+        )
+    }
+
     private fun validConfig(
         id: String = "cfg-1",
         displayName: String = "Test OpenAI",

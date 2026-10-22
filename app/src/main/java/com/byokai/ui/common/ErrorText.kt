@@ -36,7 +36,13 @@ fun ProviderError.userMessage(): UiText = when (this) {
         )
 
     is ProviderError.InvalidModel ->
-        UiText.Res(R.string.error_provider_invalid_model, listOf(modelId))
+        if (modelId.isBlank()) {
+            // Never render "Model  is not..." — when the model id is
+            // unknown (e.g. a listing call), use the nameless message.
+            UiText.Res(R.string.error_provider_invalid_model_unknown)
+        } else {
+            UiText.Res(R.string.error_provider_invalid_model, listOf(modelId))
+        }
 
     is ProviderError.Server ->
         UiText.Res(R.string.error_provider_server, listOf(statusCode, message))

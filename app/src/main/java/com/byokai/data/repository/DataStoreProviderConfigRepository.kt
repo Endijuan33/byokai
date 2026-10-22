@@ -70,6 +70,7 @@ class DataStoreProviderConfigRepository(
         if (json.isNullOrBlank()) return emptyList()
         return try {
             ProviderJson.decodeFromString(CONFIGS_SERIALIZER, json)
+                .map { migrateLegacyBaseUrl(it) }
         } catch (e: Exception) {
             // Corrupt payload: degrade to empty rather than crash.
             emptyList()
@@ -88,5 +89,29 @@ class DataStoreProviderConfigRepository(
         private val CONFIGS_SERIALIZER = ListSerializer(ProviderConfig.serializer())
 
         internal val KEY_CONFIGS_JSON = stringPreferencesKey("configs_json")
+
+        /**
+         * One-time base-URL migration for the v0.8.1 base-URL convention
+         * change: stored configs created before v0.8.1 carry the old
+         * defaults WITHOUT the `/v1` version prefix (the adapters used to
+         * append it). Appends `/v1` for EXACT matches of those old
+         * defaults only. Custom user URLs are NEVER touched — an unknown
+         * URL is returned unchanged even if it looks similar.
+         *
+         * Applied on every decode, so the migrated URL is what the UI
+         * and adapters see; the next [save] persists it.
+         */
+        internal fun migrateLegacyBaseUrl(config: ProviderConfig): ProviderConfig {
+            val migrated = LEGACY_BASE_URLS[config.baseUrl.trimEnd('/')] ?: return config
+            return config.copy(baseUrl = migrated)
+        }
+
+        private val LEGACY_BASE_URLS = mapOf(
+            "https://api.openai.com" to "https://api.openai.com/v1",
+            "https://api.anthropic.com" to "https://api.anthropic.com/v1",
+            "https://api.deepseek.com" to "https://api.deepseek.com/v1",
+            "https://api.x.ai" to "https://api.x.ai/v1",
+            "http://localhost:11434" to "http://localhost:11434/v1",
+        )
     }
 }
