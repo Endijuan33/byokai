@@ -118,7 +118,7 @@ signing (see [docs/RELEASE.md](docs/RELEASE.md)).
 
 | Layer | Tool / method | Status |
 |---|---|---|
-| JVM unit tests | `testDebugUnitTest` | Active — **253 tests, 0 failures** (CI) |
+| JVM unit tests | `testDebugUnitTest` | Active — **279 tests, 0 failures** (CI) |
 | Android lint | `lintDebug` (`abortOnError = true`) | Active (CI) |
 | Dependency review | PR checks | Active |
 | Dependabot | Weekly (Gradle + Actions) | Active |
