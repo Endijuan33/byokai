@@ -41,10 +41,17 @@ data class GeminiInlineData(
     val data: String,
 )
 
-/** One part of a request content or system instruction: text, or inline image data. */
+/**
+ * One part of a request content or system instruction: text, or inline image data.
+ *
+ * The API models this as a protobuf oneof, so exactly one member may be
+ * present: [text] MUST be null (not `""`) on image parts — even an explicit
+ * `"text": ""` counts as "set" and the API rejects the request with
+ * HTTP 400 ("oneof field 'data' is already set").
+ */
 @Serializable
 data class GeminiPart(
-    val text: String = "",
+    val text: String? = null,
     /** Present only when the part carries an attached image; omitted when null. */
     val inlineData: GeminiInlineData? = null,
 )

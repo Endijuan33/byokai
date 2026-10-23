@@ -463,7 +463,7 @@ class GeminiAdapter(
      */
     private fun extractText(chunk: GeminiStreamChunk): String =
         chunk.candidates.firstOrNull()?.content?.parts.orEmpty()
-            .map { it.text }
+            .mapNotNull { it.text }
             .filter { it.isNotEmpty() }
             .joinToString("")
 
