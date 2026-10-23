@@ -130,8 +130,8 @@ class GeminiVisionWireTest {
         // The API models a part as a oneof: a "text" key — even "" —
         // alongside "inlineData" is rejected with HTTP 400.
         assertNull(
-            parts[1].jsonObject["text"],
             "image part must not carry a text key; body was: ${recorded.body?.utf8()}",
+            parts[1].jsonObject["text"],
         )
     }
 
