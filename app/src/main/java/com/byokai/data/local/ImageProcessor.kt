@@ -50,8 +50,12 @@ class ImageProcessor(
     suspend fun process(uri: Uri): ImageAttachment =
         withContext(Dispatchers.IO) {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            open(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-                ?: throw IOException("Cannot open image: $uri")
+            // NOTE: decodeStream RETURNS NULL when inJustDecodeBounds is
+            // set — the dimensions land in bounds.outWidth/outHeight, not
+            // in the return value. A null stream (not a null return)
+            // means the image could not be opened.
+            val input = open(uri) ?: throw IOException("Cannot open image: $uri")
+            input.use { BitmapFactory.decodeStream(it, null, bounds) }
             val (srcW, srcH) = bounds.outWidth to bounds.outHeight
             require(srcW > 0 && srcH > 0) { "Not a decodable image: $uri" }
 
