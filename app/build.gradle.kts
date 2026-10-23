@@ -17,9 +17,9 @@ android {
         applicationId = "com.byokai"
         minSdk = 28
         targetSdk = 37
-        versionCode = 12
+        versionCode = 13
         // Overridable from the release workflow via -Pbyokai.versionName=<x.y.z>.
-        versionName = (findProperty("byokai.versionName") as String?) ?: "0.10.1"
+        versionName = (findProperty("byokai.versionName") as String?) ?: "0.10.2"
         // Milestone 3B ships an instrumented test for the keystore-backed
         // credential path; runs on-device only (Phase 5 device matrix), not CI.
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

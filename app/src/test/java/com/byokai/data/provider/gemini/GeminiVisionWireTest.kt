@@ -23,6 +23,7 @@ import mockwebserver3.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -125,6 +126,12 @@ class GeminiVisionWireTest {
         assertEquals(
             Base64.getEncoder().encodeToString(storage.bytes),
             inlineData["data"]!!.jsonPrimitive.content,
+        )
+        // The API models a part as a oneof: a "text" key — even "" —
+        // alongside "inlineData" is rejected with HTTP 400.
+        assertNull(
+            parts[1].jsonObject["text"],
+            "image part must not carry a text key; body was: ${recorded.body?.utf8()}",
         )
     }
 
