@@ -12,7 +12,7 @@
 # See docs/ROADMAP.md for the plan to reintroduce them once KSP supports Kotlin 2.4.x.
 
 [versions]
-agp = "9.4.1"
+agp = "9.5.0"
 kotlin = "2.4.21"
 composeBom = "2026.09.00"
 coreKtx = "1.19.1"
