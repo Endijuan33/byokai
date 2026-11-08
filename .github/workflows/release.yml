@@ -145,7 +145,7 @@ jobs:
           sha256sum apk/release/app-release.apk bundle/release/app-release.aab | tee "$GITHUB_WORKSPACE/checksums-sha256.txt"
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v3.0.3
+        uses: softprops/action-gh-release@v3.0.4
         with:
           tag_name: v${{ inputs.versionName }}
           name: BYOKAI v${{ inputs.versionName }}
