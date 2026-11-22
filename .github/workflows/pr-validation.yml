@@ -50,7 +50,7 @@ jobs:
         run: gradle lintDebug --stacktrace
 
       - name: Dependency review
-        uses: actions/dependency-review-action@v5.0.0
+        uses: actions/dependency-review-action@v5.0.1
 
       - name: Upload reports on failure
         if: failure()
